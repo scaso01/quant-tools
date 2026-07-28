@@ -1,0 +1,23 @@
+services:
+  dashboard:
+    image: quant-tools-dashboard:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: quant-dashboard
+    restart: unless-stopped
+    ports:
+      - "8503:8501"
+    volumes:
+      - quant-data:/app/data
+    environment:
+      - CACHE_DB_PATH=/app/data/quant_tools_cache.db
+      - LOG_FILE=/app/data/quant_tools.log
+      - FRED_API_KEY=${FRED_API_KEY}
+    mem_limit: 2g
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+volumes:
+  quant-data:

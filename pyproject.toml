@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-tools"
+version = "0.1.0"
+description = "Quantitative finance toolkit for retail market analysis"
+requires-python = ">=3.11"
+dependencies = [
+    "yfinance>=0.2.36",
+    "fredapi>=0.5.2",
+    "pandas>=2.1.0",
+    "numpy>=2.0.0",
+    "scipy>=1.12.0",
+    "scikit-learn>=1.4.0",
+    "plotly>=5.18.0",
+    "matplotlib>=3.8.0",
+    "textual>=0.85.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "sqlalchemy>=2.0.0",
+    "streamlit>=1.32.0",
+    "streamlit-searchbox>=0.1.14",
+    # Multi-asset data providers
+    "ccxt>=4.0.0",
+    "pandas-datareader>=0.10.0",
+    "cot-reports>=0.1.0",
+    # Portfolio optimization + Monte Carlo
+    "cvxpy>=1.4.0",
+    "pyportfolioopt>=1.5.5",
+    # SEC filings
+    "sec-edgar-downloader>=5.1.0",
+    "edgartools>=0.30.0",
+    # Reddit sentiment
+    "praw>=7.7.0",
+    # Regime detection
+    "hmmlearn>=0.3.0",
+]
+
+[project.optional-dependencies]
+ml = [
+    # ML prediction engine + enhanced indicators (require torch/ray/numba -- Python 3.13 max)
+    "pandas-ta>=0.3.14b",
+    "lightgbm>=4.0.0",
+    "statsforecast>=1.7.0",
+    "neuralforecast>=1.7.0",
+    "prophet>=1.1.5",
+    "arch>=7.0.0",
+]
+docs = [
+    # Document parsing (torch dependency — isolate from neuralforecast)
+    "docling>=2.0.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pyflakes>=3.2.0",
+]
+e2e = [
+    "pytest-playwright>=0.5.0",
+    "playwright>=1.40.0",
+]
+foundation = [
+    "chronos-forecasting>=1.0.0",
+    "timesfm>=2.0.0",
+    "uni2ts>=1.0.0",
+]
+nlp = [
+    "transformers>=4.35.0",
+]
+realtime = [
+    "websockets>=12.0",
+    "python-binance>=1.0.19",
+    "alpaca-trade-api>=3.0.0",
+]
+reports = [
+    "fpdf2>=2.7.0",
+]
+alt-data = [
+    "gdeltPyR>=0.1.0",
+    "pytrends>=4.9.0",
+    # dbnomics removed — AGPL-3.0; module uses httpx REST API directly
+    "mwviews>=0.1.0",
+    "sdmx1>=5.0.0",
+    "pycoingecko>=3.0.0",
+    "fear-and-greed>=0.1.0",
+]
+
+[project.scripts]
+quant-tools = "quant_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+quant_tools = ["data/universes/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+markers = [
+    "dashboard: Dashboard regression tests (hit live Streamlit server)",
+    "e2e: End-to-end Playwright browser tests (require running Streamlit server)",
+]

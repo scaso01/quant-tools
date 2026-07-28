@@ -1,0 +1,106 @@
+"""E2E test fixtures for Playwright-based Streamlit dashboard testing.
+
+Playwright uses Chrome DevTools Protocol (CDP over local WebSocket),
+so the parent conftest.py network guards (requests/httpx/urllib) do NOT
+interfere with browser connections.
+"""
+
+from __future__ import annotations
+
+import os
+import socket
+
+import pytest
+from playwright.sync_api import sync_playwright
+
+from .streamlit_helpers import StreamlitPage
+
+# ── Configuration ────────────────────────────────────────────────────
+
+DEFAULT_URL = "http://localhost:8501"
+HEALTH_PATH = "/_stcore/health"
+PROBE_TIMEOUT = 5  # seconds
+
+
+def _is_reachable(url: str) -> bool:
+    """TCP probe to check if Streamlit server is up."""
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 80
+        sock = socket.create_connection((host, port), timeout=PROBE_TIMEOUT)
+        sock.close()
+        return True
+    except (OSError, TimeoutError):
+        return False
+
+
+# ── Session-scoped fixtures ──────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def streamlit_url() -> str:
+    """Base URL for the Streamlit server under test."""
+    return os.environ.get("STREAMLIT_E2E_URL", DEFAULT_URL)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _check_streamlit_reachable(streamlit_url: str) -> None:
+    """Skip all E2E tests if the Streamlit server is unreachable."""
+    if not _is_reachable(streamlit_url):
+        pytest.skip(
+            f"Streamlit server unreachable at {streamlit_url}. "
+            "Start with 'quant-tools web' or set STREAMLIT_E2E_URL."
+        )
+
+
+@pytest.fixture(scope="session")
+def _playwright():
+    """Playwright instance for the session."""
+    with sync_playwright() as pw:
+        yield pw
+
+
+@pytest.fixture(scope="session")
+def browser(_playwright):
+    """Headless Chromium browser for the session."""
+    b = _playwright.chromium.launch(
+        headless=not os.environ.get("HEADED", ""),
+        args=["--disable-gpu", "--no-sandbox"],
+    )
+    yield b
+    b.close()
+
+
+# ── Function-scoped fixtures ─────────────────────────────────────────
+
+
+@pytest.fixture
+def page(browser, streamlit_url: str):
+    """Fresh browser page (tab) per test with Streamlit loaded."""
+    ctx = browser.new_context(
+        viewport={"width": 1920, "height": 1080},
+        ignore_https_errors=True,
+    )
+    pg = ctx.new_page()
+    pg.goto(streamlit_url, wait_until="networkidle", timeout=30_000)
+    # Wait for Streamlit app shell
+    pg.wait_for_selector(
+        '[data-testid="stAppViewContainer"]', timeout=15_000
+    )
+    # Wait for sidebar radio (signals app.py executed successfully)
+    pg.wait_for_selector(
+        '[data-testid="stSidebar"] [data-testid="stRadio"]',
+        timeout=15_000,
+    )
+    yield pg
+    pg.close()
+    ctx.close()
+
+
+@pytest.fixture
+def st_page(page) -> StreamlitPage:
+    """StreamlitPage wrapper with widget interaction helpers."""
+    return StreamlitPage(page)
