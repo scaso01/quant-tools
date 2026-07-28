@@ -11,9 +11,16 @@ import os
 import socket
 
 import pytest
-from playwright.sync_api import sync_playwright
 
-from .streamlit_helpers import StreamlitPage
+# Playwright ships in the optional [e2e] extra. Importing it unconditionally
+# aborted collection for the whole test suite on a plain [dev] install, so no
+# tests ran at all. Skipping this directory instead leaves the rest runnable.
+sync_playwright = pytest.importorskip(
+    "playwright.sync_api",
+    reason="playwright is not installed; install the [e2e] extra to run these",
+).sync_playwright
+
+from .streamlit_helpers import StreamlitPage  # noqa: E402
 
 # ── Configuration ────────────────────────────────────────────────────
 
