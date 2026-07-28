@@ -5,6 +5,8 @@ suggestions on empty query, and a star toggle for favorites.
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 import streamlit as st
 from streamlit_searchbox import st_searchbox
 
@@ -70,7 +72,11 @@ def render_symbol_picker(
     Returns:
         The selected symbol string, or ``None`` if nothing is selected.
     """
-    container = st.sidebar if sidebar else st
+    # The streamlit module itself is not a context manager, so `with st:` raised
+    # and truncated every page that asked for the main body: Backtest, Factors
+    # and Predictions all pass sidebar=False. Writing to the current container
+    # is the no-op case, which is what nullcontext expresses.
+    container = st.sidebar if sidebar else nullcontext()
 
     with container:
         pick_col, star_col = st.columns([5, 1])
