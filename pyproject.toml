@@ -21,7 +21,8 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
     "sqlalchemy>=2.0.0",
-    "streamlit>=1.32.0",
+    # Floor is st.iframe, which replaced the deprecated st.components.v1.html.
+    "streamlit>=1.60.0,<2.0.0",
     "streamlit-searchbox>=0.1.14",
     # Multi-asset data providers
     "ccxt>=4.0.0",

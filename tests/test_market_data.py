@@ -18,9 +18,13 @@ class TestFetchPrices:
         """Test that cached data is returned without API call."""
         from quant_tools.cache import CacheManager
         from quant_tools.data import market_data
+        from quant_tools.retry import yfinance_breaker
 
         cache = CacheManager(tmp_db)
         market_data._cache = cache
+        # fetch_prices checks the breaker before the cache, and the breaker is a
+        # process-wide singleton that earlier tests leave open.
+        yfinance_breaker.reset()
 
         # Pre-populate cache
         prices = [

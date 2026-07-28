@@ -75,6 +75,24 @@ PRESETS: dict[str, dict[str, float]] = {
 DEFAULT_HOLDINGS = '{"AAPL": 0.3, "MSFT": 0.2, "BND": 0.3, "GLD": 0.2}'
 
 
+def _with_ids(
+    pairs: dict[str, float] | list[tuple[str, float]],
+) -> list[tuple[int, str, float]]:
+    """Attach a fresh row id to each ``(symbol, weight)`` pair.
+
+    Holding rows are keyed by these ids, not by their position. The browser
+    keeps its own copy of every widget's value and echoes it back by key on
+    each rerun, so with position-based keys any programmatic change (delete,
+    preset, normalize, JSON edit) was immediately overwritten by whatever
+    previously occupied that slot: deleting a row removed the last one instead.
+    A new id makes the widget remount and take the new value.
+    """
+    items = list(pairs.items()) if isinstance(pairs, dict) else list(pairs)
+    next_id = int(st.session_state.get("portfolio_next_row_id", 0))
+    st.session_state["portfolio_next_row_id"] = next_id + len(items)
+    return [(next_id + i, sym, float(wt)) for i, (sym, wt) in enumerate(items)]
+
+
 # ── Render ────────────────────────────────────────────────────────────
 
 
@@ -103,9 +121,7 @@ def render() -> None:
         for col, (name, weights) in zip(preset_cols, PRESETS.items()):
             with col:
                 if st.button(name, key=f"preset_{name}", use_container_width=True):
-                    st.session_state["portfolio_holdings_list"] = [
-                        (sym, wt) for sym, wt in weights.items()
-                    ]
+                    st.session_state["portfolio_holdings_list"] = _with_ids(weights)
                     st.rerun()
 
         # ── Visual Holdings Builder ──────────────────────────────
@@ -118,26 +134,24 @@ def render() -> None:
                     "portfolio_holdings_json", DEFAULT_HOLDINGS
                 )
                 _init = json.loads(_init_json) if isinstance(_init_json, str) else {}
-                st.session_state["portfolio_holdings_list"] = [
-                    (sym, wt) for sym, wt in _init.items()
-                ]
+                st.session_state["portfolio_holdings_list"] = _with_ids(_init)
             except (ValueError, TypeError):
-                st.session_state["portfolio_holdings_list"] = [
-                    ("AAPL", 0.3), ("MSFT", 0.2), ("BND", 0.3), ("GLD", 0.2),
-                ]
+                st.session_state["portfolio_holdings_list"] = _with_ids(
+                    [("AAPL", 0.3), ("MSFT", 0.2), ("BND", 0.3), ("GLD", 0.2)]
+                )
 
-        _holdings_list: list[tuple[str, float]] = st.session_state[
+        _holdings_list: list[tuple[int, str, float]] = st.session_state[
             "portfolio_holdings_list"
         ]
         _to_remove: int | None = None
 
-        for idx, (sym, wt) in enumerate(_holdings_list):
+        for idx, (rid, sym, wt) in enumerate(_holdings_list):
             c_sym, c_wt, c_del = st.columns([3, 2, 1])
             with c_sym:
                 new_sym = st.text_input(
                     "Ticker",
                     value=sym,
-                    key=f"hold_sym_{idx}",
+                    key=f"hold_sym_{rid}",
                     label_visibility="collapsed",
                     placeholder="AAPL",
                 )
@@ -149,16 +163,17 @@ def render() -> None:
                     value=float(wt),
                     step=0.05,
                     format="%.2f",
-                    key=f"hold_wt_{idx}",
+                    key=f"hold_wt_{rid}",
                     label_visibility="collapsed",
                 )
             with c_del:
-                if st.button("\u2715", key=f"hold_del_{idx}"):
+                if st.button("\u2715", key=f"hold_del_{rid}"):
                     _to_remove = idx
 
-            # Update in-place if changed
+            # Update in-place if changed. The row keeps its id: the user typed
+            # this value, so the browser's copy is the authoritative one.
             if (new_sym, new_wt) != (sym, wt):
-                _holdings_list[idx] = (new_sym.upper().strip(), new_wt)
+                _holdings_list[idx] = (rid, new_sym.upper().strip(), new_wt)
                 st.session_state["portfolio_holdings_list"] = _holdings_list
 
         # Remove holding
@@ -169,12 +184,12 @@ def render() -> None:
 
         # Add holding button
         if st.button("+ Add Holding", key="hold_add", use_container_width=True):
-            _holdings_list.append(("", 0.10))
+            _holdings_list.extend(_with_ids([("", 0.10)]))
             st.session_state["portfolio_holdings_list"] = _holdings_list
             st.rerun()
 
         # Weight sum indicator
-        _weight_sum = sum(wt for _, wt in _holdings_list)
+        _weight_sum = sum(wt for _, _, wt in _holdings_list)
         _sum_color = ACCENT_GREEN if abs(_weight_sum - 1.0) < 0.01 else ACCENT_AMBER
         st.markdown(
             f'<div style="text-align:right;font-size:0.8rem;color:{_sum_color};">'
@@ -183,35 +198,45 @@ def render() -> None:
         )
         if abs(_weight_sum - 1.0) >= 0.01 and _weight_sum > 0:
             if st.button("Normalize to 100%", key="hold_norm", use_container_width=True):
-                _holdings_list = [
-                    (sym, wt / _weight_sum) for sym, wt in _holdings_list
-                ]
+                # New ids: every weight changes, so every row must remount.
+                _holdings_list = _with_ids(
+                    [(sym, wt / _weight_sum) for _, sym, wt in _holdings_list]
+                )
                 st.session_state["portfolio_holdings_list"] = _holdings_list
                 st.rerun()
 
         # Convert list to JSON for backward compat
         holdings_json = json.dumps(
-            {sym: wt for sym, wt in _holdings_list if sym.strip()},
+            {sym: wt for _, sym, wt in _holdings_list if sym.strip()},
             indent=2,
         )
         st.session_state["portfolio_holdings_json"] = holdings_json
 
-        # JSON fallback for power users
+        # JSON fallback for power users.
+        # The box is re-keyed whenever the computed JSON changes. Without that
+        # it holds the browser's older text, disagrees with holdings_json on
+        # the next run, and writes its stale holdings back over whatever the
+        # user just did, which silently undid edits and the Quick Start presets.
+        if st.session_state.get("portfolio_json_rendered") != holdings_json:
+            st.session_state["portfolio_json_rendered"] = holdings_json
+            st.session_state["portfolio_json_gen"] = (
+                int(st.session_state.get("portfolio_json_gen", 0)) + 1
+            )
+        _json_key = f"portfolio_json_fallback_{st.session_state['portfolio_json_gen']}"
+
         with st.expander("Advanced: JSON Mode"):
             _json_edit = st.text_area(
                 "Holdings JSON",
                 value=holdings_json,
                 height=80,
-                key="portfolio_json_fallback",
+                key=_json_key,
                 help="Edit directly as JSON. Changes here override the visual builder.",
             )
             if _json_edit != holdings_json:
                 try:
                     _parsed = json.loads(_json_edit)
                     if isinstance(_parsed, dict):
-                        st.session_state["portfolio_holdings_list"] = [
-                            (sym, wt) for sym, wt in _parsed.items()
-                        ]
+                        st.session_state["portfolio_holdings_list"] = _with_ids(_parsed)
                         st.session_state["portfolio_holdings_json"] = _json_edit
                         st.rerun()
                 except (ValueError, TypeError):
@@ -338,9 +363,11 @@ def render() -> None:
                     use_container_width=True,
                     type="primary",
                 ):
-                    st.session_state["portfolio_holdings_json"] = json.dumps(
-                        weights, indent=2,
-                    )
+                    # Set the list, not the JSON. The sidebar rebuilds
+                    # portfolio_holdings_json from the list on every run, so
+                    # writing the JSON here was discarded and these Quick Start
+                    # buttons did nothing.
+                    st.session_state["portfolio_holdings_list"] = _with_ids(weights)
                     st.rerun()
 
         st.markdown("---")

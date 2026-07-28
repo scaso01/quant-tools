@@ -215,7 +215,7 @@ if _cmd_input:
 
 # ── Keyboard Shortcut (/ to focus search) ────────────────────────────
 
-st.components.v1.html(
+st.iframe(
     """<script>
 const doc = window.parent.document;
 doc.addEventListener('keydown', function(e) {
@@ -231,7 +231,9 @@ doc.addEventListener('keydown', function(e) {
     }
 });
 </script>""",
-    height=0,
+    # ponytail: 1px, not 0. st.iframe rejects height=0, which the deprecated
+    # st.components.v1.html allowed. This frame only carries a keydown handler.
+    height=1,
 )
 
 # ── Page Render ───────────────────────────────────────────────────────

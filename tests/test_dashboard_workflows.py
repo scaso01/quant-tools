@@ -635,15 +635,23 @@ class TestBacktesterWorkflow:
 
         assert not at.exception
 
-    def test_backtester_ticker_input(self):
-        """Backtester has a ticker text input defaulting to AAPL."""
+    def test_backtester_symbol_picker_defaults_to_aapl(self):
+        """Backtester seeds the symbol picker with AAPL when nothing is active."""
         at = _load_app()
         at.run()
-        _navigate(at, "Backtester")
 
-        ticker_inputs = [t for t in at.sidebar.text_input if t.key == "bt_ticker"]
-        assert len(ticker_inputs) == 1
-        assert ticker_inputs[0].value == "AAPL"
+        # st_searchbox is a custom component, so AppTest cannot read its key or
+        # value. Patching the picker keeps what the old text_input test checked:
+        # the widget key, and the AAPL default.
+        with patch(
+            "quant_tools.dashboard.views.backtest.render_symbol_picker",
+            return_value=None,
+        ) as picker:
+            _navigate(at, "Backtester")
+
+        assert not at.exception
+        assert picker.call_args.kwargs["key"] == "bt_symbol_picker"
+        assert picker.call_args.kwargs["default"] == "AAPL"
 
     def test_backtester_data_error_shows_warning(self):
         """DataError during fetch shows a user-friendly warning."""
@@ -701,14 +709,37 @@ class TestBacktesterWorkflow:
 class TestPortfolioWorkflow:
     """Portfolio Analyzer page -- full analysis workflow with mocked data."""
 
-    def test_portfolio_initial_state_shows_info(self):
-        """Before clicking Analyze, an info message is shown."""
+    def test_portfolio_initial_state_shows_quick_start(self):
+        """Before clicking Analyze, the Quick Start preset gallery is shown."""
         at = _load_app()
         at.run()
         _navigate(at, "Portfolio")
         assert not at.exception
-        info_texts = [str(i.value) for i in at.info]
-        assert any("Enter your holdings" in t for t in info_texts)
+        markdown_texts = [str(m.value) for m in at.markdown]
+        assert any("Quick Start" in t for t in markdown_texts)
+        assert "empty_preset_60/40" in [b.key for b in at.button]
+
+    def test_portfolio_delete_removes_the_clicked_holding(self):
+        """The X on a row removes that row, not whichever one renders last."""
+        at = _load_app()
+        at.run()
+        _navigate(at, "Portfolio")
+
+        before = [
+            t.value for t in at.sidebar.text_input if t.key.startswith("hold_sym_")
+        ]
+        assert len(before) >= 3, before
+
+        dels = [b for b in at.sidebar.button if b.key.startswith("hold_del_")]
+        assert len(dels) == len(before)
+        dels[1].click()
+        at.run()
+
+        assert not at.exception
+        after = [
+            t.value for t in at.sidebar.text_input if t.key.startswith("hold_sym_")
+        ]
+        assert after == [s for i, s in enumerate(before) if i != 1]
 
     def test_portfolio_analyze_renders_charts(self):
         """Analyzing portfolio renders sector donut and correlation heatmap."""
@@ -796,16 +827,15 @@ class TestPortfolioWorkflow:
         at.run()
         _navigate(at, "Portfolio")
 
-        # Set holdings to invalid JSON
-        for ta in at.sidebar.text_area:
-            if ta.key == "portfolio_holdings_json":
-                ta.set_value("not valid json {{{")
-                break
-
-        for b in at.sidebar.button:
-            if b.key == "portfolio_run":
-                b.click()
-                break
+        # Holdings are built visually now, so the JSON entry point lives in the
+        # "Advanced: JSON Mode" expander and validates on edit, not on Analyze.
+        fallback = [
+            ta
+            for ta in at.sidebar.text_area
+            if ta.key.startswith("portfolio_json_fallback")
+        ]
+        assert len(fallback) == 1
+        fallback[0].set_value("not valid json {{{")
         at.run()
 
         assert not at.exception
@@ -878,12 +908,10 @@ class TestPortfolioWorkflow:
         """Empty holdings object shows an error."""
         at = _load_app()
         at.run()
+        # Start the builder empty. Emptying it after the rows have rendered
+        # makes AppTest look up hold_wt_* keys that the new render dropped.
+        at.session_state["portfolio_holdings_list"] = []
         _navigate(at, "Portfolio")
-
-        for ta in at.sidebar.text_area:
-            if ta.key == "portfolio_holdings_json":
-                ta.set_value("{}")
-                break
 
         for b in at.sidebar.button:
             if b.key == "portfolio_run":
@@ -1086,14 +1114,19 @@ class TestPredictionsWorkflow:
         info_texts = [str(i.value) for i in at.info]
         assert any("predict" in t.lower() or "prediction" in t.lower() for t in info_texts)
 
-    def test_predictions_has_symbol_input(self):
-        """Predictions page has a symbol text input for new predictions."""
+    def test_predictions_renders_symbol_picker(self):
+        """Predictions page renders the symbol searchbox for new predictions."""
         at = _load_app()
         at.run()
         _navigate(at, "Predictions")
 
-        input_keys = [t.key for t in at.text_input]
-        assert "pred_symbol_input" in input_keys
+        assert not at.exception
+        # The searchbox is a custom component, so it surfaces as a component
+        # instance rather than a text_input.
+        assert len(at.get("component_instance")) >= 1
+        # Widgets rendered after the picker prove it did not truncate the page.
+        assert "pred_horizon_select" in [s.key for s in at.selectbox]
+        assert "pred_run" in [b.key for b in at.button]
 
     def test_predictions_has_predict_button(self):
         """Predictions page has a Predict button."""
