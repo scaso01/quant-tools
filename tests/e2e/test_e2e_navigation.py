@@ -1,6 +1,6 @@
 """E2E tests for cross-page navigation in the Streamlit dashboard.
 
-Verifies sidebar radio navigation, query-param routing, and
+Verifies sidebar button navigation, query-param routing, and
 basic chrome (brand, cache button) across all 10 dashboard pages.
 """
 
@@ -39,17 +39,11 @@ def _strip_emoji(name: str) -> str:
 
 
 class TestNavigation:
-    """Core sidebar-radio navigation tests."""
+    """Core sidebar-button navigation tests."""
 
     def test_all_pages_listed(self, st_page: StreamlitPage) -> None:
-        """Sidebar radio should expose exactly 10 page options."""
-        names = st_page.get_page_names()
-        # Filter out the radio group label ("Navigation") which is
-        # collapsed but still present in the DOM as a label element.
-        page_names = [n for n in names if n not in ("Navigation", "")]
-        assert len(page_names) == 10, (
-            f"Expected 10 pages, got {len(page_names)}: {page_names}"
-        )
+        """The sidebar should expose all 10 pages, in registry order."""
+        assert st_page.get_page_names() == ALL_PAGE_NAMES
 
     def test_default_page_is_scanner(self, st_page: StreamlitPage) -> None:
         """First load (no query params) should land on Market Scanner."""
@@ -64,7 +58,7 @@ class TestNavigation:
     def test_navigate_to_each_page(
         self, st_page: StreamlitPage, page_name: str
     ) -> None:
-        """Navigate to *page_name* via sidebar radio; verify the header."""
+        """Navigate to *page_name* via the sidebar; verify the header."""
         st_page.navigate_to(page_name)
 
         plain_label = _strip_emoji(page_name)

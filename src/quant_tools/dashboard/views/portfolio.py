@@ -93,6 +93,34 @@ def _with_ids(
     return [(next_id + i, sym, float(wt)) for i, (sym, wt) in enumerate(items)]
 
 
+# The visual builder's weight box is bounded to [0, 1]. A weight outside that
+# range arriving through JSON mode used to reach st.number_input directly and
+# raise, which killed the whole page: "The value -0.5 is less than the min_value
+# 0.0", sidebar truncated, nothing left to click. JSON mode is a trust boundary,
+# so weights are checked here before they can become widget state.
+MIN_WEIGHT = 0.0
+MAX_WEIGHT = 1.0
+
+
+def _holdings_error(parsed: object) -> str | None:
+    """Return why *parsed* is unusable as holdings, or ``None`` if it is fine."""
+    if not isinstance(parsed, dict) or not parsed:
+        return (
+            "Holdings must be a non-empty JSON object, "
+            'e.g. {"AAPL": 0.5, "BND": 0.5}'
+        )
+    for symbol, weight in parsed.items():
+        # bool is an int subclass, and True is not a weight.
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)):
+            return f"Weight for {symbol} must be a number."
+        if not MIN_WEIGHT <= float(weight) <= MAX_WEIGHT:
+            return (
+                f"Weight for {symbol} must be between {MIN_WEIGHT:.0f} and "
+                f"{MAX_WEIGHT:.0f}, got {weight}."
+            )
+    return None
+
+
 # ── Render ────────────────────────────────────────────────────────────
 
 
@@ -235,12 +263,16 @@ def render() -> None:
             if _json_edit != holdings_json:
                 try:
                     _parsed = json.loads(_json_edit)
-                    if isinstance(_parsed, dict):
+                except (ValueError, TypeError):
+                    st.error("Invalid JSON")
+                else:
+                    _holdings_err = _holdings_error(_parsed)
+                    if _holdings_err:
+                        st.error(_holdings_err)
+                    else:
                         st.session_state["portfolio_holdings_list"] = _with_ids(_parsed)
                         st.session_state["portfolio_holdings_json"] = _json_edit
                         st.rerun()
-                except (ValueError, TypeError):
-                    st.error("Invalid JSON")
 
         period = st.selectbox(
             "Period",

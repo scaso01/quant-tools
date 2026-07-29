@@ -2218,10 +2218,10 @@ class TestAppTestLive:
     def test_live_renders(self, app):
         assert not app.exception
 
-    def test_live_shows_coming_soon(self, app):
-        """Live page shows coming-soon info message."""
+    def test_live_prompts_before_fetching(self, app):
+        """Live page prompts to refresh rather than fetching on navigation."""
         info_texts = [str(i.value) for i in app.info]
-        assert any("WebSocket" in t or "Scanner" in t for t in info_texts)
+        assert any("Refresh Now" in t for t in info_texts)
 
 
 @pytest.mark.dashboard

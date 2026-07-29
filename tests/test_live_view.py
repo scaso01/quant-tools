@@ -20,6 +20,11 @@ def _mock_streamlit():
     mock_st.sidebar.__exit__ = MagicMock(return_value=False)
     mock_st.text_area.return_value = "AAPL, MSFT, GOOGL"
     mock_st.slider.return_value = 5
+    # A real dict, so the "has this been run yet" gate reads False rather than a
+    # truthy MagicMock. Without this the view falls straight through to fetching
+    # live prices, which these tests neither want nor mock.
+    mock_st.session_state = {}
+    mock_st.button.return_value = False
     # columns with context manager support
     col_mock = MagicMock()
     col_mock.__enter__ = MagicMock(return_value=col_mock)
@@ -77,8 +82,12 @@ class TestLiveView:
         result = parse_watchlist("AAPL\nMSFT\nGOOGL")
         assert result == ["AAPL", "MSFT", "GOOGL"]
 
-    def test_render_shows_coming_soon(self, _mock_streamlit):
-        """render() should show coming-soon state with info message."""
+    def test_render_prompts_before_fetching(self, _mock_streamlit):
+        """Before Refresh is pressed, render() prompts instead of fetching."""
         from quant_tools.dashboard.views.live import render
         render()
         _mock_streamlit.info.assert_called()
+        prompt = " ".join(
+            str(call.args[0]) for call in _mock_streamlit.info.call_args_list
+        )
+        assert "Refresh Now" in prompt

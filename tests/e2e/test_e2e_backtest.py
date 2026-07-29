@@ -45,15 +45,14 @@ class TestBacktestWidgets:
         assert "Strategy Backtester" in visible
 
     def test_ticker_default_aapl(self, st_page: StreamlitPage) -> None:
-        """Ticker text input should default to AAPL."""
-        value = st_page.get_text_input_value("Ticker", sidebar=True)
-        assert value == "AAPL"
+        """The symbol picker should start the page on AAPL."""
+        assert st_page.symbol_picker_count() == 1
+        assert "AAPL" in st_page.get_visible_text()
 
     def test_ticker_change(self, st_page: StreamlitPage) -> None:
-        """Changing the ticker to MSFT should persist."""
-        st_page.set_text_input("Ticker", "MSFT", sidebar=True)
-        value = st_page.get_text_input_value("Ticker", sidebar=True)
-        assert value == "MSFT"
+        """Choosing MSFT in the symbol picker should drive the page to MSFT."""
+        st_page.set_symbol("MSFT")
+        assert "MSFT" in st_page.get_visible_text()
 
     def test_strategy_options(self, st_page: StreamlitPage) -> None:
         """Strategy selectbox should expose exactly four options."""
@@ -65,15 +64,16 @@ class TestBacktestWidgets:
         value = st_page.get_selectbox_value("Strategy", sidebar=True)
         assert value == "SMA Crossover"
 
-    def test_start_date_exists(self, st_page: StreamlitPage) -> None:
-        """Start Date widget should be present in the sidebar."""
-        sidebar_text = st_page.get_sidebar_text()
-        assert "Start Date" in sidebar_text
+    def test_date_range_defaults_to_one_year(
+        self, st_page: StreamlitPage
+    ) -> None:
+        """The date range is chosen with preset buttons, defaulting to 1Y."""
+        assert st_page.get_active_date_preset("bt") == "1Y"
 
-    def test_end_date_exists(self, st_page: StreamlitPage) -> None:
-        """End Date widget should be present in the sidebar."""
-        sidebar_text = st_page.get_sidebar_text()
-        assert "End Date" in sidebar_text
+    def test_date_range_preset_changes(self, st_page: StreamlitPage) -> None:
+        """Clicking a different preset should make it the active range."""
+        st_page.click_date_preset("bt", "5Y")
+        assert st_page.get_active_date_preset("bt") == "5Y"
 
     def test_capital_default(self, st_page: StreamlitPage) -> None:
         """Initial capital should default to 100000."""
@@ -132,16 +132,21 @@ class TestBacktestWidgets:
 class TestBacktestNegative:
     """Negative and edge-case tests for error handling."""
 
-    def test_empty_ticker(self, st_page: StreamlitPage) -> None:
-        """Clearing the ticker and running should not crash."""
-        st_page.set_text_input("Ticker", "", sidebar=True)
-        st_page.click_button("Run Backtest", sidebar=True, timeout=60_000)
-        visible = st_page.get_visible_text()
-        assert "Traceback" not in visible, "App should not show a raw traceback"
+    def test_invalid_ticker_offers_no_suggestion(
+        self, st_page: StreamlitPage
+    ) -> None:
+        """The picker only offers real symbols, so a bogus query matches nothing.
 
-    def test_invalid_ticker(self, st_page: StreamlitPage) -> None:
-        """An invalid ticker should not crash the app."""
-        st_page.set_text_input("Ticker", "ZZZZZ99", sidebar=True)
+        This is what keeps an invalid ticker from reaching the engine at all,
+        the old free-text ticker box could submit anything.
+        """
+        assert st_page.get_symbol_suggestions("ZZZZZ99") == []
+
+    def test_invalid_ticker_does_not_break_a_run(
+        self, st_page: StreamlitPage
+    ) -> None:
+        """A bogus query leaves the page on its default symbol and still runs."""
+        st_page.get_symbol_suggestions("ZZZZZ99")
         st_page.click_button("Run Backtest", sidebar=True, timeout=60_000)
         visible = st_page.get_visible_text()
         assert "Traceback" not in visible, "App should not show a raw traceback"

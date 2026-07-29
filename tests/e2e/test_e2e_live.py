@@ -1,7 +1,7 @@
 """E2E Playwright tests for the Live Monitor page.
 
 Covers widget defaults, watchlist interaction, refresh slider,
-and negative/edge-case inputs for the placeholder live feed page.
+and negative/edge-case inputs for the live feed page.
 """
 from __future__ import annotations
 
@@ -54,6 +54,14 @@ class TestLiveWidgets:
         visible = st_page.get_visible_text()
         assert "BTC" in visible
         assert "Traceback" not in visible
+
+    def test_watchlist_table_renders(self, st_page) -> None:
+        """Refreshing the default watchlist should produce quote cards and a table."""
+        st_page.click_button("Refresh Now", sidebar=True, timeout=120_000)
+        visible = st_page.get_visible_text()
+        assert "In Development" not in visible, "Page is still a placeholder"
+        assert st_page.get_metric_count() >= 1, "Expected watchlist summary cards"
+        assert st_page.has_dataframe(), "Expected the watchlist quote table"
 
 
 # -- TestLiveNegative ----------------------------------------------------------

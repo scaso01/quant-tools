@@ -64,9 +64,9 @@ class TestPredictionsWidgets:
         options = st_page.get_selectbox_options("Model")
         assert options == MODEL_OPTIONS
 
-    def test_symbol_input_exists(self, st_page: StreamlitPage) -> None:
-        """Symbol text input should be present on the page."""
-        assert st_page.widget_exists(SEL_TEXT_INPUT, "Symbol")
+    def test_symbol_picker_exists(self, st_page: StreamlitPage) -> None:
+        """The symbol picker should be present on the page."""
+        assert st_page.symbol_picker_count() == 1
 
     def test_predict_button_exists(self, st_page: StreamlitPage) -> None:
         """Predict button should be present on the page."""
@@ -93,9 +93,17 @@ class TestPredictionsNegative:
         visible = st_page.get_visible_text()
         assert "Traceback" not in visible, "App should not show a raw traceback"
 
-    def test_predict_invalid_symbol(self, st_page: StreamlitPage) -> None:
-        """Typing an invalid symbol and clicking Predict should not crash."""
-        st_page.set_text_input("Symbol", "!!!!")
+    def test_invalid_symbol_offers_no_suggestion(
+        self, st_page: StreamlitPage
+    ) -> None:
+        """The picker only offers real symbols, so junk input matches nothing."""
+        assert st_page.get_symbol_suggestions("!!!!") == []
+
+    def test_predict_after_invalid_symbol(
+        self, st_page: StreamlitPage
+    ) -> None:
+        """Junk in the picker should leave Predict working, not crash the page."""
+        st_page.get_symbol_suggestions("!!!!")
         st_page.click_button("Predict", timeout=60_000)
         visible = st_page.get_visible_text()
         assert "Traceback" not in visible, "App should not show a raw traceback"
@@ -105,7 +113,9 @@ class TestPredictionsNegative:
         visible = st_page.get_visible_text()
         # Either predictions are shown (dataframe) or the info message appears
         has_data = st_page.has_dataframe()
-        has_info_msg = st_page.has_info("No predictions found")
+        # Covers both empty states: "No predictions yet" before anything has been
+        # generated, and "No predictions match your filters" once filters narrow.
+        has_info_msg = st_page.has_info("No predictions")
         assert has_data or has_info_msg, (
             "Expected either a predictions dataframe or 'No predictions found' info message"
         )
@@ -127,7 +137,7 @@ class TestPredictionsWorkflows:
 
     def test_generate_prediction(self, st_page: StreamlitPage) -> None:
         """Typing AAPL and clicking Predict should produce results or a graceful error."""
-        st_page.set_text_input("Symbol", "AAPL")
+        st_page.set_symbol("AAPL")
         st_page.click_button("Predict", timeout=60_000)
         visible = st_page.get_visible_text()
         assert "Traceback" not in visible, "App should not show a raw traceback"

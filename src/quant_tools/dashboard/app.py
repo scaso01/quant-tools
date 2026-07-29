@@ -87,7 +87,9 @@ GROUPS = {
     "TOOLS": ["🤖 AI Analysis"],
 }
 
-SCAFFOLDED = {"📉 Rolling Analytics", "🛡️ Risk Dashboard", "⚡ Live Monitor"}
+# Pages still rendering a "coming soon" card rather than real analysis. Empty
+# now that Rolling Analytics, Risk Dashboard and Live Monitor are built.
+SCAFFOLDED: set[str] = set()
 
 # ── Sidebar ───────────────────────────────────────────────────────────
 

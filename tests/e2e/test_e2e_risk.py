@@ -1,7 +1,7 @@
 """E2E Playwright tests for the Risk Dashboard page.
 
 Covers widget defaults, metric card rendering, sidebar interactions,
-and boundary tests for the placeholder risk metrics page.
+and boundary tests for the risk metrics page.
 """
 from __future__ import annotations
 
@@ -41,10 +41,19 @@ class TestRiskWidgets:
         assert "Historical" in options
         assert "Parametric" in options
 
-    def test_metric_placeholders(self, st_page) -> None:
-        """At least one st.metric card should render on the page."""
+    def test_metric_cards_render(self, st_page) -> None:
+        """The four risk metric cards should render once analysis is run."""
+        st_page.click_button("Analyze Risk", sidebar=True, timeout=120_000)
         count = st_page.get_metric_count()
-        assert count >= 1, f"Expected at least 1 metric card, got {count}"
+        assert count >= 4, f"Expected the 4 risk metric cards, got {count}"
+
+    def test_risk_visuals_render(self, st_page) -> None:
+        """The page should draw the drawdown chart and per-holding table."""
+        st_page.click_button("Analyze Risk", sidebar=True, timeout=120_000)
+        visible = st_page.get_visible_text()
+        assert "In Development" not in visible, "Page is still a placeholder"
+        assert st_page.has_plotly_chart(), "Expected the drawdown chart"
+        assert st_page.has_dataframe(), "Expected the per-holding risk table"
 
 
 # -- TestRiskNegative ----------------------------------------------------------

@@ -125,8 +125,9 @@ class TestScannerWidgets:
         assert btn.count() > 0
 
     def test_initial_info_message(self, st_page) -> None:
+        """Before any scan the page should prompt with the recommended setup."""
         _navigate(st_page)
-        assert st_page.has_info("Configure scanner settings")
+        assert st_page.has_info("Ready to scan")
 
 
 # ── Negative / Validation Tests ──────────────────────────────────────

@@ -42,10 +42,29 @@ ANALYSIS_TIMEOUT = 120_000
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
+# The holdings JSON box is the power-user fallback behind the visual row
+# builder, so it sits in the sidebar inside a collapsed expander. Its contents
+# are not reachable until that expander is opened.
+JSON_EXPANDER = "Advanced: JSON Mode"
+JSON_LABEL = "Holdings JSON"
+
+
 @pytest.fixture(autouse=True)
 def _navigate_to_portfolio(st_page: StreamlitPage) -> None:
     """Navigate to the Portfolio Analyzer page before every test."""
     st_page.navigate_to(PAGE_NAME)
+
+
+def _set_holdings_json(st_page: StreamlitPage, value: str) -> None:
+    """Open the JSON expander and replace the holdings JSON."""
+    st_page.expand_expander(JSON_EXPANDER, sidebar=True)
+    st_page.set_text_area(JSON_LABEL, value, sidebar=True)
+
+
+def _get_holdings_json(st_page: StreamlitPage) -> str:
+    """Open the JSON expander and read the holdings JSON."""
+    st_page.expand_expander(JSON_EXPANDER, sidebar=True)
+    return st_page.get_text_area_value(JSON_LABEL, sidebar=True)
 
 
 # ── TestPortfolioWidgets ─────────────────────────────────────────────────
@@ -82,7 +101,7 @@ class TestPortfolioWidgets:
 
     def test_holdings_textarea_default(self, st_page: StreamlitPage) -> None:
         """Holdings textarea should contain the default JSON on first load."""
-        value = st_page.get_text_area_value("Holdings (JSON)", sidebar=True)
+        value = _get_holdings_json(st_page)
         assert "AAPL" in value
         assert "MSFT" in value
         assert "BND" in value
@@ -90,9 +109,8 @@ class TestPortfolioWidgets:
 
     def test_holdings_textarea_edit(self, st_page: StreamlitPage) -> None:
         """Editing the holdings textarea should persist the new value."""
-        new_holdings = '{"SPY": 0.5, "BND": 0.5}'
-        st_page.set_text_area("Holdings (JSON)", new_holdings, sidebar=True)
-        value = st_page.get_text_area_value("Holdings (JSON)", sidebar=True)
+        _set_holdings_json(st_page, '{"SPY": 0.5, "BND": 0.5}')
+        value = _get_holdings_json(st_page)
         assert "SPY" in value
         assert "BND" in value
 
@@ -154,7 +172,7 @@ class TestPortfolioWidgets:
         sidebar = st_page.get_sidebar_text()
         # The page header or sidebar should contain Portfolio-related content
         has_portfolio_heading = "Portfolio Analyzer" in visible
-        has_portfolio_sidebar = "Holdings (JSON)" in sidebar or "Portfolio Settings" in sidebar
+        has_portfolio_sidebar = "Holdings" in sidebar or "Portfolio Settings" in sidebar
         has_info_prompt = "Enter your holdings" in visible or "Analyze Portfolio" in visible
         assert has_portfolio_heading or has_portfolio_sidebar or has_info_prompt, (
             "Initial state should show the Portfolio Analyzer page"
@@ -169,7 +187,7 @@ class TestPortfolioNegative:
 
     def test_invalid_json(self, st_page: StreamlitPage) -> None:
         """Submitting malformed JSON should show an error, not crash."""
-        st_page.set_text_area("Holdings (JSON)", "{invalid}", sidebar=True)
+        _set_holdings_json(st_page, "{invalid}")
         st_page.click_button("Analyze Portfolio", sidebar=True, timeout=ANALYSIS_TIMEOUT)
 
         visible = st_page.get_visible_text()
@@ -183,7 +201,7 @@ class TestPortfolioNegative:
 
     def test_empty_json_object(self, st_page: StreamlitPage) -> None:
         """Submitting an empty JSON object '{}' should show an error."""
-        st_page.set_text_area("Holdings (JSON)", "{}", sidebar=True)
+        _set_holdings_json(st_page, "{}")
         st_page.click_button("Analyze Portfolio", sidebar=True, timeout=ANALYSIS_TIMEOUT)
 
         visible = st_page.get_visible_text()
@@ -196,9 +214,7 @@ class TestPortfolioNegative:
 
     def test_nonexistent_ticker(self, st_page: StreamlitPage) -> None:
         """A nonexistent ticker should produce a data error, not a crash."""
-        st_page.set_text_area(
-            "Holdings (JSON)", '{"ZZZZZ99": 1.0}', sidebar=True
-        )
+        _set_holdings_json(st_page, '{"ZZZZZ99": 1.0}')
         st_page.click_button("Analyze Portfolio", sidebar=True, timeout=120_000)
 
         visible = st_page.get_visible_text()
@@ -207,9 +223,7 @@ class TestPortfolioNegative:
 
     def test_single_holding(self, st_page: StreamlitPage) -> None:
         """A single-holding portfolio should not crash (edge case for correlation)."""
-        st_page.set_text_area(
-            "Holdings (JSON)", '{"AAPL": 1.0}', sidebar=True
-        )
+        _set_holdings_json(st_page, '{"AAPL": 1.0}')
         st_page.click_button("Analyze Portfolio", sidebar=True, timeout=ANALYSIS_TIMEOUT)
 
         visible = st_page.get_visible_text()
@@ -218,10 +232,17 @@ class TestPortfolioNegative:
         )
 
     def test_negative_weights(self, st_page: StreamlitPage) -> None:
-        """Negative weights (short positions) should be handled gracefully."""
-        st_page.set_text_area(
-            "Holdings (JSON)", '{"AAPL": -0.5, "MSFT": 1.5}', sidebar=True
+        """Out-of-range weights should be rejected, not applied.
+
+        The builder's weight box is bounded to [0, 1]. A weight outside that
+        range used to reach the widget and kill the whole page, taking the
+        Analyze button with it.
+        """
+        _set_holdings_json(st_page, '{"AAPL": -0.5, "MSFT": 1.5}')
+        assert st_page.has_error("must be between"), (
+            "Expected an out-of-range weight to be rejected with an error"
         )
+        # The page must still be usable, which is what the crash destroyed.
         st_page.click_button("Analyze Portfolio", sidebar=True, timeout=ANALYSIS_TIMEOUT)
 
         visible = st_page.get_visible_text()
@@ -231,7 +252,7 @@ class TestPortfolioNegative:
 
     def test_empty_textarea(self, st_page: StreamlitPage) -> None:
         """Clearing the textarea entirely should show an error."""
-        st_page.set_text_area("Holdings (JSON)", " ", sidebar=True)
+        _set_holdings_json(st_page, " ")
         st_page.click_button("Analyze Portfolio", sidebar=True, timeout=ANALYSIS_TIMEOUT)
 
         visible = st_page.get_visible_text()
@@ -274,7 +295,7 @@ class TestPortfolioWorkflows:
         st_page.click_button("60/40", sidebar=True)
 
         # Verify the textarea was updated with preset holdings
-        value = st_page.get_text_area_value("Holdings (JSON)", sidebar=True)
+        value = _get_holdings_json(st_page)
         assert "SPY" in value, "60/40 preset should contain SPY"
         assert "BND" in value, "60/40 preset should contain BND"
 

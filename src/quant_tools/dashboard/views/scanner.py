@@ -95,6 +95,20 @@ for _label in ("Intraday · 4 hours", "Intraday · 6 hours",
 
 _DEFAULT_TIMEFRAME = "Monthly · 3 months"
 
+# Non-equity asset classes scan their own fixed symbol lists rather than an
+# equity universe preset. Module level so the sidebar can describe what is about
+# to be scanned, not just the scan itself.
+CRYPTO_SYMBOLS = [
+    "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT",
+    "ADA/USDT", "AVAX/USDT", "DOT/USDT", "DOGE/USDT",
+    "LINK/USDT", "ATOM/USDT", "LTC/USDT", "NEAR/USDT",
+    "APT/USDT", "ALGO/USDT", "TRX/USDT",
+]
+FOREX_SYMBOLS = [
+    "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD",
+    "USD/CAD", "NZD/USD", "EUR/GBP", "EUR/JPY", "GBP/JPY",
+]
+
 
 def _get_timeframes(asset_class: str) -> list[str]:
     """Return timeframe labels available for the given asset class."""
@@ -102,6 +116,31 @@ def _get_timeframes(asset_class: str) -> list[str]:
         label for label, classes in _TIMEFRAME_SUPPORT.items()
         if asset_class in classes
     ]
+
+
+def _describe_scan_pool(
+    asset_class: str,
+    preset: UniversePreset,
+    commodity_category: str | None,
+) -> tuple[str, str, int]:
+    """Return (name, description, count) for the pool that will be scanned.
+
+    The Universe selectbox only ever holds equity presets and is disabled for the
+    other asset classes, so its preset must not be used to describe a crypto,
+    forex or commodity scan. Doing so left the sidebar advertising an S&P 500
+    scan while Crypto was selected.
+    """
+    if asset_class == "Crypto":
+        return "Crypto", "Major cryptocurrency pairs", len(CRYPTO_SYMBOLS)
+    if asset_class == "Forex":
+        return "Forex", "Major currency pairs", len(FOREX_SYMBOLS)
+    if asset_class == "Commodity":
+        category = commodity_category or "All Commodities"
+        symbols = COMMODITY_PRESETS.get(
+            category, COMMODITY_PRESETS["All Commodities"]
+        )
+        return category, f"{category} futures and ETFs", len(symbols)
+    return preset.name, preset.description, preset.count
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -384,16 +423,8 @@ def render() -> None:
                 "\u2014 scan may take 30\u201360 seconds."
             )
 
-        # Dynamic info badge
-        st.markdown(
-            f'<div class="universe-info">'
-            f'<span class="universe-dot"></span>'
-            f"{preset.description} ({preset.count} stocks)"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
         # ── Commodity Category (only when Commodity asset class) ──
+        # Chosen before the info badge below, which reports its symbol count.
         commodity_category: str | None = None
         if asset_class_option == "Commodity":
             st.markdown(
@@ -407,6 +438,18 @@ def render() -> None:
                 label_visibility="collapsed",
                 help="Filter commodities by category (energy, metals, etc.)",
             )
+
+        # Dynamic info badge, describing the pool that will actually be scanned
+        scan_pool_name, _scan_pool_desc, _scan_pool_count = _describe_scan_pool(
+            asset_class_option, preset, commodity_category
+        )
+        st.markdown(
+            f'<div class="universe-info">'
+            f'<span class="universe-dot"></span>'
+            f"{_scan_pool_desc} ({_scan_pool_count} symbols)"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
         # ── Signals (2x2 checkbox grid) ─────────────────────────
         st.markdown(
@@ -447,7 +490,8 @@ def render() -> None:
         selected_signals = [s for s, on in _sig_checks.items() if on]
 
         # ── Sector Filter (expander, only for sector-aware universes) ─
-        if preset.has_sectors:
+        # Sectors are an equity concept; the preset is stale for other classes.
+        if asset_class_option == "Equity" and preset.has_sectors:
             all_sectors = sorted(SECTOR_MAP.keys())
 
             # Count how many are selected for the summary
@@ -549,7 +593,7 @@ def render() -> None:
     st.markdown(
         '<div class="dashboard-header">'
         "<h1>Market Scanner</h1>"
-        f"<p>Scanning {preset.name} for trading signals</p>"
+        f"<p>Scanning {scan_pool_name} for trading signals</p>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -569,21 +613,12 @@ def render() -> None:
 
     # ── Build symbol list from selections ────────────────────────────
     if run_scan:
-        # Non-equity asset classes use their own symbol lists
-        _CRYPTO_SYMBOLS = [
-            "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT",
-            "ADA/USDT", "AVAX/USDT", "DOT/USDT", "DOGE/USDT",
-            "LINK/USDT", "ATOM/USDT", "LTC/USDT", "NEAR/USDT",
-            "APT/USDT", "ALGO/USDT", "TRX/USDT",
-        ]
-        _FOREX_SYMBOLS = [
-            "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD",
-            "USD/CAD", "NZD/USD", "EUR/GBP", "EUR/JPY", "GBP/JPY",
-        ]
+        # Non-equity asset classes use their own symbol lists (module level, so
+        # the sidebar badge above counts exactly what gets scanned here).
         if asset_class_option == "Crypto":
-            unique_symbols = _CRYPTO_SYMBOLS
+            unique_symbols = list(CRYPTO_SYMBOLS)
         elif asset_class_option == "Forex":
-            unique_symbols = _FOREX_SYMBOLS
+            unique_symbols = list(FOREX_SYMBOLS)
         elif asset_class_option == "Commodity":
             # Use selected commodity category, fall back to all commodities
             _cat = commodity_category or "All Commodities"

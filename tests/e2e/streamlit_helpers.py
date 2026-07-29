@@ -6,6 +6,8 @@ only require changes in this one file.
 
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Page, expect
 
 # ── Selector Constants ───────────────────────────────────────────────
@@ -22,6 +24,32 @@ METRIC_CARD = ".metric-card"
 METRIC_CARD_LABEL = ".metric-card-label"
 METRIC_CARD_VALUE = ".metric-card-value"
 
+# Streamlit 1.60 moved its widgets from BaseWeb to react-aria. The outer
+# ``data-testid`` containers survived that move, the insides did not:
+# ``[data-baseweb="select"]`` and the slider's ``[role="slider"]`` thumb are both
+# gone. These constants name the replacements.
+#
+# The selectbox dropdown renders into a body-level portal, NOT inside the widget,
+# so option locators must be page-scoped. It is also virtualised: options sit at
+# absolute offsets and Playwright refuses to click them ("element is outside of
+# the viewport"), even with force=True. Type-to-filter then Enter is the only
+# reliable way to drive it.
+SEL_COMBOBOX_INPUT = 'input[role="combobox"]'
+SEL_COMBOBOX_TRIGGER = 'button[aria-haspopup="listbox"]'
+SEL_DROPDOWN = '[data-testid="stSelectboxVirtualDropdown"]'
+SEL_OPTION = '[role="option"]'
+# The slider thumb is a visually hidden native range input, which is better than
+# the old ARIA attributes: it carries real min/max/step/value.
+SEL_SLIDER_INPUT = 'input[type="range"]'
+SEL_SLIDER_THUMB_VALUE = '[data-testid="stSliderThumbValue"]'
+
+# The symbol picker is st_searchbox, a custom component, so it lives in its own
+# iframe and none of the ordinary Streamlit widget selectors reach it.
+SEL_SEARCHBOX = 'iframe[title="streamlit_searchbox.searchbox"]'
+# Date ranges are chosen with a row of preset buttons keyed "{prefix}_dp_{name}",
+# not with st.date_input.
+DATE_PRESETS = ("1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "5Y")
+
 # Widget container selectors
 SEL_SELECTBOX = '[data-testid="stSelectbox"]'
 SEL_MULTISELECT = '[data-testid="stMultiSelect"]'
@@ -36,6 +64,21 @@ SEL_DATE_INPUT = '[data-testid="stDateInput"]'
 SEL_FILE_UPLOADER = '[data-testid="stFileUploader"]'
 SEL_EXPANDER = '[data-testid="stExpander"]'
 SEL_RADIO = '[data-testid="stRadio"]'
+
+# Sidebar navigation is a column of st.button widgets keyed ``nav_<page name>``.
+# Streamlit stamps each key onto the element container as an ``st-key-`` class,
+# sanitising every non-alphanumeric character to a hyphen, so the key
+# ``nav_📡 Market Scanner`` renders as ``st-key-nav_---Market-Scanner``. Matching
+# that prefix selects exactly the ten nav buttons and skips the watchlist,
+# footer and page-specific controls that share the sidebar.
+NAV_BUTTON = '[class*="st-key-nav_"]'
+# Not-yet-built pages carry this marker at the end of their button label.
+SCAFFOLD_MARKER = "◦"
+
+
+def _plain_label(page_name: str) -> str:
+    """Strip the leading emoji and any trailing scaffold marker from a page name."""
+    return re.sub(r"^[^\w]+", "", page_name).replace(SCAFFOLD_MARKER, "").strip()
 
 # Timeout defaults (ms)
 RERUN_TIMEOUT = 30_000
@@ -52,34 +95,28 @@ class StreamlitPage:
     # ── Navigation ───────────────────────────────────────────────────
 
     def navigate_to(self, page_name: str) -> None:
-        """Click a sidebar radio option to navigate to a page.
+        """Click a sidebar navigation button to navigate to a page.
 
         ``page_name`` should be the full display name including emoji,
         e.g. "📡 Market Scanner".
         """
-        sidebar = self.page.locator(SIDEBAR)
-        # Streamlit radio options are rendered as label elements
-        option = sidebar.locator(
-            f'{SEL_RADIO} label:has-text("{page_name}")'
-        )
+        buttons = self.page.locator(SIDEBAR).locator(NAV_BUTTON)
+        # filter(has_text=...) matches on rendered text, so the emoji needs no
+        # CSS escaping the way it would inside a :has-text() selector string.
+        option = buttons.filter(has_text=page_name)
         if option.count() == 0:
-            # Fallback: match partial text (without emoji)
-            clean = page_name.lstrip()
-            for ch in page_name:
-                if ch.isalpha():
-                    break
-                clean = page_name[page_name.index(ch) + 1 :].lstrip()
-            option = sidebar.locator(
-                f'{SEL_RADIO} label:has-text("{clean}")'
-            )
-        option.first.click()
+            # Fallback: match the plain label, without the emoji.
+            option = buttons.filter(has_text=_plain_label(page_name))
+        option.first.locator("button").first.click()
         self.wait_for_rerun()
 
     def get_page_names(self) -> list[str]:
-        """Return all navigation radio option texts."""
-        sidebar = self.page.locator(SIDEBAR)
-        labels = sidebar.locator(f"{SEL_RADIO} label")
-        return [labels.nth(i).inner_text() for i in range(labels.count())]
+        """Return all sidebar navigation button labels."""
+        buttons = self.page.locator(SIDEBAR).locator(NAV_BUTTON)
+        return [
+            buttons.nth(i).inner_text().replace(SCAFFOLD_MARKER, "").strip()
+            for i in range(buttons.count())
+        ]
 
     # ── Wait Helpers ─────────────────────────────────────────────────
 
@@ -106,8 +143,13 @@ class StreamlitPage:
         except Exception:
             pass  # May never have appeared
 
-        # Extra safety: wait for network idle
-        self.page.wait_for_load_state("networkidle", timeout=5_000)
+        # Extra safety: wait for network idle. Best effort only, Streamlit holds
+        # a websocket open, so a busy app can simply never go idle. Letting this
+        # raise turned a settled page into a test failure.
+        try:
+            self.page.wait_for_load_state("networkidle", timeout=5_000)
+        except Exception:
+            pass
 
     def wait_for_app_loaded(self) -> None:
         """Wait for the initial Streamlit app shell to render."""
@@ -135,24 +177,43 @@ class StreamlitPage:
 
     # ── Selectbox ────────────────────────────────────────────────────
 
+    def _open_combobox(self, widget) -> None:
+        """Open a selectbox dropdown, whichever of its two hit targets works.
+
+        Clicking the combobox input opens the list on most pages; on some the
+        trigger button is the one that responds. Which one works varies with
+        where the widget sits, so try the input, then fall back to the trigger.
+        """
+        if self.page.locator(SEL_DROPDOWN).count() > 0:
+            return
+        for target in (SEL_COMBOBOX_INPUT, SEL_COMBOBOX_TRIGGER):
+            el = widget.locator(target)
+            if el.count() == 0:
+                continue
+            el.first.click()
+            try:
+                self.page.wait_for_selector(SEL_DROPDOWN, timeout=3_000)
+                return
+            except Exception:
+                continue
+
     def select_box(
         self, label: str, value: str, sidebar: bool = False
     ) -> None:
-        """Open a Streamlit selectbox and choose a value."""
+        """Choose *value* in a Streamlit selectbox.
+
+        Types the value to filter the list and commits with Enter. Clicking the
+        option is not an option: the dropdown is virtualised, so Playwright sees
+        every option as outside the viewport and refuses the click, even with
+        force=True.
+        """
         widget = self._find_widget_by_label(SEL_SELECTBOX, label, sidebar)
-        # Click the current value to open dropdown
-        widget.locator('[data-baseweb="select"]').click()
-        # Wait for dropdown list to appear
-        self.page.wait_for_selector(
-            '[data-baseweb="popover"] li, [role="listbox"] [role="option"]',
-            timeout=WIDGET_TIMEOUT,
-        )
-        # Click the desired option
-        option = self.page.locator(
-            f'[data-baseweb="popover"] li:has-text("{value}"), '
-            f'[role="listbox"] [role="option"]:has-text("{value}")'
-        ).first
-        option.click()
+        self._open_combobox(widget)
+        combo = widget.locator(SEL_COMBOBOX_INPUT).first
+        combo.fill(value)
+        # Wait for the list to narrow to the typed value before committing.
+        self.page.wait_for_selector(SEL_OPTION, timeout=WIDGET_TIMEOUT)
+        self.page.keyboard.press("Enter")
         self.wait_for_rerun()
 
     def get_selectbox_value(
@@ -160,21 +221,20 @@ class StreamlitPage:
     ) -> str:
         """Read the current value of a selectbox."""
         widget = self._find_widget_by_label(SEL_SELECTBOX, label, sidebar)
-        return widget.locator('[data-baseweb="select"]').inner_text().strip()
+        return widget.locator(SEL_COMBOBOX_INPUT).first.input_value().strip()
 
     def get_selectbox_options(
         self, label: str, sidebar: bool = False
     ) -> list[str]:
-        """Open a selectbox and return all option texts, then close it."""
+        """Open a selectbox and return the option texts, then close it.
+
+        The dropdown is virtualised, so for a long list this returns only the
+        options currently rendered, not every option in the widget.
+        """
         widget = self._find_widget_by_label(SEL_SELECTBOX, label, sidebar)
-        widget.locator('[data-baseweb="select"]').click()
-        self.page.wait_for_selector(
-            '[data-baseweb="popover"] li, [role="listbox"] [role="option"]',
-            timeout=WIDGET_TIMEOUT,
-        )
-        options_loc = self.page.locator(
-            '[data-baseweb="popover"] li, [role="listbox"] [role="option"]'
-        )
+        self._open_combobox(widget)
+        self.page.wait_for_selector(SEL_OPTION, timeout=WIDGET_TIMEOUT)
+        options_loc = self.page.locator(SEL_OPTION)
         opts = [
             options_loc.nth(i).inner_text()
             for i in range(options_loc.count())
@@ -214,15 +274,17 @@ class StreamlitPage:
     def set_slider(
         self, label: str, value: float, sidebar: bool = False
     ) -> None:
-        """Set a slider value using keyboard interaction."""
+        """Set a slider value using keyboard interaction.
+
+        The thumb is a visually hidden native range input, so min/max/step come
+        off the input itself rather than from ARIA attributes.
+        """
         widget = self._find_widget_by_label(SEL_SLIDER, label, sidebar)
-        thumb = widget.locator('[role="slider"]').first
-        thumb.click()
-        # Read current value from aria-valuenow
-        current = float(thumb.get_attribute("aria-valuenow") or 0)
-        min_val = float(thumb.get_attribute("aria-valuemin") or 0)
-        max_val = float(thumb.get_attribute("aria-valuemax") or 100)
-        step = float(thumb.get_attribute("aria-valuestep") or 1)
+        thumb = widget.locator(SEL_SLIDER_INPUT).first
+        # The input is clipped to a 1px box, so focus it rather than click it.
+        thumb.focus()
+        current = float(thumb.input_value() or 0)
+        step = float(thumb.get_attribute("step") or 1)
 
         if step == 0:
             step = 1
@@ -242,10 +304,11 @@ class StreamlitPage:
     def get_slider_value(
         self, label: str, sidebar: bool = False
     ) -> float:
-        """Read current slider value from aria-valuenow."""
+        """Read the current slider value off its native range input."""
         widget = self._find_widget_by_label(SEL_SLIDER, label, sidebar)
-        thumb = widget.locator('[role="slider"]').first
-        return float(thumb.get_attribute("aria-valuenow") or 0)
+        return float(
+            widget.locator(SEL_SLIDER_INPUT).first.input_value() or 0
+        )
 
     # ── Checkbox ─────────────────────────────────────────────────────
 
@@ -449,14 +512,18 @@ class StreamlitPage:
     def set_select_slider(
         self, label: str, value: str, sidebar: bool = False
     ) -> None:
-        """Set a select_slider by using keyboard to cycle to the value."""
+        """Set a select_slider by using keyboard to cycle to the value.
+
+        A select_slider's labels live in ``aria-valuetext``; its range input
+        holds only the numeric index.
+        """
         widget = self._find_widget_by_label(SEL_SLIDER, label, sidebar)
-        thumb = widget.locator('[role="slider"]').first
-        thumb.click()
+        thumb = widget.locator(SEL_SLIDER_INPUT).first
+        thumb.focus()
 
         # Try pressing right until we find the value (max 50 presses)
         for _ in range(50):
-            current = thumb.get_attribute("aria-valuenow") or ""
+            current = thumb.get_attribute("aria-valuetext") or ""
             if value.lower() in current.lower():
                 break
             self.page.keyboard.press("ArrowRight")
@@ -464,12 +531,71 @@ class StreamlitPage:
             # Try going left from the start
             self.page.keyboard.press("Home")
             for _ in range(50):
-                current = thumb.get_attribute("aria-valuenow") or ""
+                current = thumb.get_attribute("aria-valuetext") or ""
                 if value.lower() in current.lower():
                     break
                 self.page.keyboard.press("ArrowRight")
 
         self.wait_for_rerun()
+
+    # ── Symbol Picker (st_searchbox custom component) ────────────────
+
+    def symbol_picker_count(self) -> int:
+        """Number of symbol pickers rendered on the current page."""
+        return self.page.locator(SEL_SEARCHBOX).count()
+
+    def set_symbol(self, value: str) -> None:
+        """Type a symbol into the picker and commit the first suggestion.
+
+        The picker is a custom component in an iframe, and its suggestion list
+        renders inside that same iframe, so both have to be reached through a
+        frame locator.
+        """
+        box = self.page.frame_locator(SEL_SEARCHBOX).first
+        inp = box.locator("input").first
+        inp.click()
+        inp.fill(value)
+        # Wait for the suggestion list to catch up with the typed text.
+        box.locator(SEL_OPTION).first.wait_for(
+            state="visible", timeout=WIDGET_TIMEOUT
+        )
+        inp.press("Enter")
+        self.wait_for_rerun()
+
+    def get_symbol_suggestions(self, query: str) -> list[str]:
+        """Type *query* and return the suggestion labels, without committing."""
+        box = self.page.frame_locator(SEL_SEARCHBOX).first
+        inp = box.locator("input").first
+        inp.click()
+        inp.fill(query)
+        try:
+            box.locator(SEL_OPTION).first.wait_for(
+                state="visible", timeout=WIDGET_TIMEOUT
+            )
+        except Exception:
+            return []
+        opts = box.locator(SEL_OPTION)
+        return [opts.nth(i).inner_text() for i in range(opts.count())]
+
+    # ── Date Presets ─────────────────────────────────────────────────
+
+    def click_date_preset(self, key_prefix: str, preset: str) -> None:
+        """Click a date-range preset button, e.g. ``("bt", "5Y")``."""
+        self.page.locator(
+            f'[class*="st-key-{key_prefix}_dp_{preset}"] button'
+        ).first.click()
+        self.wait_for_rerun()
+
+    def get_active_date_preset(self, key_prefix: str) -> str | None:
+        """Return the highlighted date preset, which renders as a primary button."""
+        for preset in DATE_PRESETS:
+            btn = self.page.locator(
+                f'[class*="st-key-{key_prefix}_dp_{preset}"] '
+                f'[data-testid="stBaseButton-primary"]'
+            )
+            if btn.count() > 0:
+                return preset
+        return None
 
     # ── Assertion Helpers ────────────────────────────────────────────
 

@@ -97,10 +97,13 @@ def page(browser, streamlit_url: str):
     pg.wait_for_selector(
         '[data-testid="stAppViewContainer"]', timeout=15_000
     )
-    # Wait for sidebar radio (signals app.py executed successfully)
+    # Wait for a sidebar nav button carrying its label (signals app.py executed
+    # successfully). Waiting on the container alone is not enough: on a cold
+    # server the nav containers appear before Streamlit paints their labels, and
+    # a test reading the nav then sees a handful of blank buttons.
     pg.wait_for_selector(
-        '[data-testid="stSidebar"] [data-testid="stRadio"]',
-        timeout=15_000,
+        '[data-testid="stSidebar"] [class*="st-key-nav_"]:has-text("Market Scanner")',
+        timeout=30_000,
     )
     yield pg
     pg.close()

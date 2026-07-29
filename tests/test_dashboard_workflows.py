@@ -1263,15 +1263,15 @@ class TestRollingWorkflow:
         _navigate(at, "Rolling")
         assert not at.exception
 
-    def test_rolling_shows_coming_soon(self):
-        """Rolling page shows coming-soon state with info message."""
+    def test_rolling_prompts_before_fetching(self):
+        """Rolling page prompts to run rather than fetching on navigation."""
         at = _load_app()
         at.run()
         _navigate(at, "Rolling")
 
         assert not at.exception
         info_texts = [str(i.value) for i in at.info]
-        assert any("Portfolio Analyzer" in t for t in info_texts)
+        assert any("Run Analysis" in t for t in info_texts)
 
 
 # =====================================================================
@@ -1290,15 +1290,15 @@ class TestRiskWorkflow:
         _navigate(at, "Risk")
         assert not at.exception
 
-    def test_risk_shows_coming_soon(self):
-        """Risk page shows coming-soon state with info message."""
+    def test_risk_prompts_before_fetching(self):
+        """Risk page prompts to analyze rather than fetching on navigation."""
         at = _load_app()
         at.run()
         _navigate(at, "Risk")
 
         assert not at.exception
         info_texts = [str(i.value) for i in at.info]
-        assert any("Portfolio Analyzer" in t for t in info_texts)
+        assert any("Analyze Risk" in t for t in info_texts)
 
     def test_risk_compute_var_function(self):
         """Verify the VaR computation helper works correctly."""
@@ -1349,15 +1349,15 @@ class TestLiveWorkflow:
         _navigate(at, "Live")
         assert not at.exception
 
-    def test_live_shows_coming_soon(self):
-        """Live page shows coming-soon state with info message."""
+    def test_live_prompts_before_fetching(self):
+        """Live page prompts to refresh rather than fetching on navigation."""
         at = _load_app()
         at.run()
         _navigate(at, "Live")
 
         assert not at.exception
         info_texts = [str(i.value) for i in at.info]
-        assert any("WebSocket" in t or "Scanner" in t for t in info_texts)
+        assert any("Refresh Now" in t for t in info_texts)
 
     def test_live_parse_watchlist_function(self):
         """Verify the parse_watchlist helper function."""
