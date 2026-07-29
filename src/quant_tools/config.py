@@ -87,7 +87,7 @@ class Config:
     optimization_method: str = os.getenv("OPTIMIZATION_METHOD", "markowitz")
     risk_free_rate: float = _float("RISK_FREE_RATE", 0.04)
 
-    # LLM settings (llama-server on Beast)
+    # LLM settings, any OpenAI-compatible server (llama.cpp, Ollama, vLLM)
     llm_base_url: str = os.getenv("LLM_BASE_URL", "http://localhost:8080")
     llm_model: str = os.getenv("LLM_MODEL", "")
     llm_timeout: int = _int("LLM_TIMEOUT", 60)

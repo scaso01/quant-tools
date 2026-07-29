@@ -7,9 +7,18 @@ import logging
 import os
 import tempfile
 import threading
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from quant_tools.config import cfg
@@ -17,6 +26,47 @@ from quant_tools.config import cfg
 log = logging.getLogger("quant_tools")
 
 _lock = threading.Lock()
+
+# Slack when deciding whether cached rows cover a requested range. Markets are
+# shut at weekends and on holidays, so the first and last bars inside a window
+# routinely sit a few days inside its edges.
+COVERAGE_SLACK_DAYS = 5
+
+
+def _covers_range(
+    cached_first: str, cached_last: str, start_date: str, end_date: str
+) -> bool:
+    """True if a symbol's cached extent spans the whole requested window.
+
+    A partial overlap is not a hit. The filter in :meth:`CacheManager.get_prices`
+    matches any cached row that happens to fall inside a wider request, so
+    without this check, loading one year of a symbol and then asking for five
+    years returned the one year and never re-fetched. Every metric downstream
+    was then computed over the wrong window while the chart still drew a five
+    year axis.
+
+    Compare against the symbol's whole cached extent, not the rows the request
+    selected. Judging by the selected rows alone makes any narrow window whose
+    edges land on a market holiday look uncovered, and re-fetches data that is
+    already on disk.
+
+    Known limit: a request starting before the symbol's first ever bar can never
+    be covered, so it re-fetches every call. Correct but uncached. Store the
+    requested span alongside the rows if that ever costs real time.
+    """
+    try:
+        first = date.fromisoformat(cached_first)
+        last = date.fromisoformat(cached_last)
+        wanted_start = date.fromisoformat(start_date)
+        wanted_end = date.fromisoformat(end_date)
+    except (TypeError, ValueError):
+        # Unparseable dates mean we cannot prove coverage, so do not claim it.
+        return False
+
+    return (
+        (first - wanted_start).days <= COVERAGE_SLACK_DAYS
+        and (wanted_end - last).days <= COVERAGE_SLACK_DAYS
+    )
 
 
 class Base(DeclarativeBase):
@@ -161,6 +211,18 @@ class CacheManager:
                     .all()
                 )
                 if not rows:
+                    return None
+                extent = (
+                    session.query(
+                        func.min(PriceCache.date), func.max(PriceCache.date)
+                    )
+                    .filter(
+                        PriceCache.symbol == symbol.upper(),
+                        PriceCache.cached_at >= ttl_cutoff,
+                    )
+                    .one()
+                )
+                if not _covers_range(extent[0], extent[1], start_date, end_date):
                     return None
                 return [
                     {

@@ -654,13 +654,28 @@ class StreamlitPage:
             return self.page.locator(f":text('{text}')").count() > 0
         return False
 
-    def has_dataframe(self) -> bool:
-        """Check if at least one dataframe/table is rendered."""
-        return self.page.locator(DATAFRAME).count() > 0
+    def _appears(self, selector: str, timeout: int = 10_000) -> bool:
+        """True if *selector* is on the page, waiting up to *timeout* for it.
 
-    def has_plotly_chart(self) -> bool:
+        Dataframes and Plotly charts are heavy JS components that mount a beat
+        after the rerun that produced them settles. A bare ``count()`` raced
+        them: with the network in the loop the fetch was slow enough to hide it,
+        and against an offline server the same assertion started failing on a
+        page that renders perfectly.
+        """
+        try:
+            self.page.wait_for_selector(selector, state="attached", timeout=timeout)
+            return True
+        except Exception:
+            return False
+
+    def has_dataframe(self, timeout: int = 10_000) -> bool:
+        """Check if at least one dataframe/table is rendered."""
+        return self._appears(DATAFRAME, timeout)
+
+    def has_plotly_chart(self, timeout: int = 10_000) -> bool:
         """Check if at least one Plotly chart is rendered."""
-        return self.page.locator(PLOTLY_CHART).count() > 0
+        return self._appears(PLOTLY_CHART, timeout)
 
     def get_metric_count(self) -> int:
         """Count metric elements (st.metric OR custom .metric-card)."""

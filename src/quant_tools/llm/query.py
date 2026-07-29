@@ -15,7 +15,7 @@ from quant_tools.retry import CircuitBreaker
 log = logging.getLogger("quant_tools")
 _breaker = CircuitBreaker("llm", threshold=3, recovery_seconds=30.0)
 
-# Default LLM endpoint (Beast llama-server)
+# Default LLM endpoint, an OpenAI-compatible server on the usual local port
 DEFAULT_LLM_URL = "http://localhost:8080"
 
 

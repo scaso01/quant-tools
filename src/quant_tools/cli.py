@@ -582,10 +582,21 @@ def _cmd_web(args: list[str]) -> None:
     from pathlib import Path
 
     app = Path(__file__).parent / "dashboard" / "app.py"
+    # Streamlit resolves .streamlit/config.toml against the working directory,
+    # not the script, so an installed copy launched from anywhere else picked up
+    # no theme at all: light chrome around this app's dark cards, with headings
+    # rendering dark on dark. Pass the theme explicitly so it holds everywhere.
+    # Values match dashboard/core/colors.py and .streamlit/config.toml.
     subprocess.run(
         [sys.executable, "-m", "streamlit", "run", str(app),
          "--server.headless", "false",
-         "--browser.gatherUsageStats", "false"],
+         "--browser.gatherUsageStats", "false",
+         "--client.toolbarMode", "minimal",
+         "--theme.base", "dark",
+         "--theme.primaryColor", "#3b82f6",
+         "--theme.backgroundColor", "#0e1117",
+         "--theme.secondaryBackgroundColor", "#1c2128",
+         "--theme.textColor", "#f8fafc"],
     )
 
 

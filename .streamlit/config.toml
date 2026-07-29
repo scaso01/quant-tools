@@ -1,0 +1,20 @@
+# The dashboard ships a dark stylesheet (dashboard/style.css) for its own cards
+# and headers. Without this block Streamlit's own chrome (sidebar, background,
+# widgets) follows the viewer's system theme instead, so anyone on a light-mode
+# machine gets light chrome wrapped around dark cards, with section headings
+# rendering dark on dark. Pinning the theme here keeps the two halves agreeing.
+# Values match dashboard/core/colors.py.
+[theme]
+base = "dark"
+primaryColor = "#3b82f6"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1c2128"
+textColor = "#f8fafc"
+
+[client]
+# Hide the Deploy button and the developer menu. This is a local analysis tool,
+# not something being deployed to Streamlit Community Cloud.
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

@@ -280,7 +280,10 @@ def render_metric_card(
     """
     if glossary_key:
         from quant_tools.dashboard.core.page_help import jargon
-        display_label = jargon(glossary_key)
+        # Decorate the caller's label, do not replace it. Substituting the
+        # glossary key made the backtest page render two different cards, Total
+        # Return and CAGR, both labelled "CAGR".
+        display_label = jargon(glossary_key, label)
     else:
         display_label = label
 

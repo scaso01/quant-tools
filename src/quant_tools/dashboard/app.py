@@ -6,7 +6,14 @@ from pathlib import Path
 
 import streamlit as st
 
-from quant_tools.dashboard.views import (
+from quant_tools.testing import offline
+
+# Swap in generated market data when QUANT_TOOLS_OFFLINE is set. This runs
+# before the views import so nothing can reach the network first. It is a no-op
+# unless the environment variable is present.
+_OFFLINE = offline.activate()
+
+from quant_tools.dashboard.views import (  # noqa: E402
     ai_analysis,
     backtest,
     factors,
@@ -37,6 +44,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(f"<style>{_css}</style>", unsafe_allow_html=True)
+
+# Fabricated prices must never be mistaken for real ones, so this banner is not
+# dismissible and renders above every page.
+if _OFFLINE:
+    st.error(
+        "**Offline mode.** Every price, fundamental and headline on this "
+        f"dashboard is generated, not fetched. Unset `{offline.ENV_VAR}` to use "
+        "real market data.",
+        icon="🧪",
+    )
 
 # ── Global Symbol State ──────────────────────────────────────────────
 
@@ -233,7 +250,7 @@ doc.addEventListener('keydown', function(e) {
     }
 });
 </script>""",
-    # ponytail: 1px, not 0. st.iframe rejects height=0, which the deprecated
+    # 1px, not 0. st.iframe rejects height=0, which the deprecated
     # st.components.v1.html allowed. This frame only carries a keydown handler.
     height=1,
 )

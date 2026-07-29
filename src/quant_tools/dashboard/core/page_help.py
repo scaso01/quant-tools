@@ -82,18 +82,25 @@ GLOSSARY: dict[str, str] = {
 }
 
 
-def jargon(term: str) -> str:
+def jargon(term: str, text: str | None = None) -> str:
     """Return an HTML <abbr> element with a glossary tooltip for a finance term.
 
-    If the term is not in the glossary, returns the term unchanged.
+    Args:
+        term: Glossary key to look the definition up by.
+        text: Visible text. Defaults to *term*. Pass this when the label a page
+            shows differs from the glossary entry that explains it, for example
+            a "Total Return" card documented by the CAGR entry.
+
+    If the term is not in the glossary, returns the visible text unchanged.
     Use inside st.markdown(..., unsafe_allow_html=True) contexts.
     """
+    label = term if text is None else text
     definition = GLOSSARY.get(term, "")
     if not definition:
-        return term
+        return label
     # Escape quotes in the definition for the title attribute
     escaped = definition.replace('"', '&quot;')
-    return f'<abbr title="{escaped}">{term}</abbr>'
+    return f'<abbr title="{escaped}">{label}</abbr>'
 
 
 # ── Page Help Data ───────────────────────────────────────────────────

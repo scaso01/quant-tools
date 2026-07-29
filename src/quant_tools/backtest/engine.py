@@ -124,13 +124,25 @@ def _extract_trade_returns(
     trade_returns: list[float] = []
     in_trade = False
     trade_cumulative = 0.0
+    trade_sign = 0.0
 
     for i in range(len(daily_returns)):
         pos = positions[i]
 
         if pos != 0:
+            sign = 1.0 if pos > 0 else -1.0
             if not in_trade:
                 in_trade = True
+                trade_sign = sign
+                trade_cumulative = pos * daily_returns[i]
+            elif sign != trade_sign:
+                # Reversal straight from long to short (or back) without a flat
+                # day. That is two trades, not one. Only testing `pos != 0` here
+                # merged every reversal into a single run, which on a crossover
+                # strategy reported 1 trade for a whole multi-year backtest and
+                # left win rate at 100% with an infinite profit factor.
+                trade_returns.append(trade_cumulative)
+                trade_sign = sign
                 trade_cumulative = pos * daily_returns[i]
             else:
                 trade_cumulative += pos * daily_returns[i]
@@ -139,6 +151,7 @@ def _extract_trade_returns(
                 trade_returns.append(trade_cumulative)
                 in_trade = False
                 trade_cumulative = 0.0
+                trade_sign = 0.0
 
     # Close any open trade
     if in_trade:
