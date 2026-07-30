@@ -8,6 +8,7 @@ import os
 import tempfile
 import threading
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import (
     Column,
@@ -157,6 +158,9 @@ class CacheManager:
 
     def __init__(self, db_path: str | None = None) -> None:
         self._db_path = db_path or cfg.cache_db_path
+        # sqlite will not create missing parent directories, and the default
+        # path now lives in a per-user data directory that may not exist yet.
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         self._engine = create_engine(f"sqlite:///{self._db_path}", echo=False)
         Base.metadata.create_all(self._engine)
         self._migrate(self._engine)

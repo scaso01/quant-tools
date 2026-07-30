@@ -3,12 +3,43 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from quant_tools.errors import ConfigError
+
+
+def _data_dir() -> Path:
+    """Where the cache and the log live unless the user says otherwise.
+
+    Both used to default to a bare filename, which resolves against the working
+    directory. Launched from a directory you cannot write to, the app died with
+    a PermissionError before the dashboard came up; launched from anywhere else
+    it dropped a log file and a private copy of the cache into whatever folder
+    you happened to be standing in.
+
+    Does not create the directory. The two writers do that when they open.
+    """
+    if os.name == "nt":
+        base = os.getenv("LOCALAPPDATA") or Path.home() / "AppData" / "Local"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = os.getenv("XDG_DATA_HOME") or Path.home() / ".local" / "share"
+    return Path(base) / "quant-tools"
+
+
+def default_cache_db_path() -> str:
+    """Cache location: CACHE_DB_PATH if set, otherwise the data directory."""
+    return os.getenv("CACHE_DB_PATH") or str(_data_dir() / "quant_tools_cache.db")
+
+
+def default_log_file() -> str:
+    """Log location: LOG_FILE if set, otherwise the data directory."""
+    return os.getenv("LOG_FILE") or str(_data_dir() / "quant_tools.log")
 
 
 def _find_env() -> Path:
@@ -33,13 +64,18 @@ def _float(key: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class Config:
-    """Application configuration. Frozen for thread safety."""
+    """Application configuration. Frozen for thread safety.
+
+    Secrets carry repr=False. The dataclass repr is printed by any pytest
+    assertion that touches a Config, which put a live API key straight into
+    the test output, and would put it into a public CI log.
+    """
 
     # API keys
-    fred_api_key: str = os.getenv("FRED_API_KEY", "")
+    fred_api_key: str = field(default=os.getenv("FRED_API_KEY", ""), repr=False)
 
     # Cache settings
-    cache_db_path: str = os.getenv("CACHE_DB_PATH", "quant_tools_cache.db")
+    cache_db_path: str = field(default_factory=default_cache_db_path)
     cache_ttl_hours: int = _int("CACHE_TTL_HOURS", 24)
 
     # Scanner settings
@@ -55,7 +91,7 @@ class Config:
 
     # Logging
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
-    log_file: str = os.getenv("LOG_FILE", "quant_tools.log")
+    log_file: str = field(default_factory=default_log_file)
 
     # Prediction settings
     prediction_horizon_days: int = _int("PREDICTION_HORIZON_DAYS", 5)
@@ -66,14 +102,16 @@ class Config:
     crypto_default_exchange: str = os.getenv("CRYPTO_DEFAULT_EXCHANGE", "kraken")
 
     # Finnhub API key (free at https://finnhub.io/)
-    finnhub_api_key: str = os.getenv("FINNHUB_API_KEY", "")
+    finnhub_api_key: str = field(default=os.getenv("FINNHUB_API_KEY", ""), repr=False)
 
     # SEC EDGAR (email required by SEC fair-use policy)
     sec_edgar_email: str = os.getenv("SEC_EDGAR_EMAIL", "")
 
     # Reddit API (free at https://www.reddit.com/prefs/apps)
-    reddit_client_id: str = os.getenv("REDDIT_CLIENT_ID", "")
-    reddit_client_secret: str = os.getenv("REDDIT_CLIENT_SECRET", "")
+    reddit_client_id: str = field(default=os.getenv("REDDIT_CLIENT_ID", ""), repr=False)
+    reddit_client_secret: str = field(
+        default=os.getenv("REDDIT_CLIENT_SECRET", ""), repr=False
+    )
 
     # Commodity symbol map (futures tickers preferred, ETF fallback)
     commodity_etf_proxies: dict[str, str] = field(default_factory=lambda: {
@@ -93,8 +131,10 @@ class Config:
     llm_timeout: int = _int("LLM_TIMEOUT", 60)
 
     # Alpaca paper trading
-    alpaca_api_key: str = os.getenv("ALPACA_API_KEY", "")
-    alpaca_secret_key: str = os.getenv("ALPACA_SECRET_KEY", "")
+    alpaca_api_key: str = field(default=os.getenv("ALPACA_API_KEY", ""), repr=False)
+    alpaca_secret_key: str = field(
+        default=os.getenv("ALPACA_SECRET_KEY", ""), repr=False
+    )
 
     # Backtest cost defaults
     default_cost_bps: float = _float("DEFAULT_COST_BPS", 10.0)

@@ -5,13 +5,17 @@ from __future__ import annotations
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+from quant_tools.config import cfg
 
 
-def setup_logging(log_file: str = "quant_tools.log", level: str = "INFO") -> logging.Logger:
+def setup_logging(log_file: str | None = None, level: str = "INFO") -> logging.Logger:
     """Configure logging with file rotation and console output.
 
     Args:
-        log_file: Path to log file.
+        log_file: Path to log file. Defaults to the configured location, which
+            is a per-user data directory rather than the working directory.
         level: Console log level (DEBUG, INFO, WARNING, ERROR).
 
     Returns:
@@ -23,9 +27,12 @@ def setup_logging(log_file: str = "quant_tools.log", level: str = "INFO") -> log
     if logger.handlers:
         return logger
 
+    path = Path(log_file or cfg.log_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
     # File handler with rotation (5MB max, 3 backups)
     file_handler = RotatingFileHandler(
-        log_file,
+        path,
         maxBytes=5 * 1024 * 1024,
         backupCount=3,
         encoding="utf-8",
