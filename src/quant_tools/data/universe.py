@@ -255,7 +255,7 @@ def _build_eafe_preset() -> UniversePreset:
         sym for sym, meta in intl.items() if meta.region in eafe_regions
     ))
     return UniversePreset(
-        name="International EAFE",
+        name="International ADRs",
         symbols=symbols,
         description=f"Developed market ADRs — Europe, Australasia & Far East ({len(symbols)} constituents)",
         has_sectors=True,
@@ -279,10 +279,10 @@ def _load_global_preset() -> UniversePreset:
 _EXTENDED_PRESET_BUILDERS: dict[str, object] = {
     "S&P 500": lambda: _load_extended_preset("sp500"),
     "Russell 1000": lambda: _load_extended_preset("russell1000"),
-    "International EAFE": lambda: _build_eafe_preset(),
-    "Emerging Markets": lambda: _load_region_preset(
+    "International ADRs": lambda: _build_eafe_preset(),
+    "Emerging Market ADRs": lambda: _load_region_preset(
         region="Emerging",
-        preset_name="Emerging Markets",
+        preset_name="Emerging Market ADRs",
         description="Emerging market ADRs (China, India, Brazil, etc.)",
     ),
     "Global All": _load_global_preset,
@@ -376,9 +376,14 @@ _ASSET_CLASS_UNIVERSES: dict[str, dict[str, str]] = {
 # only spellings a reader would try and the only ones that did not work. These
 # map each documented short name onto the preset it refers to.
 _UNIVERSE_ALIASES: dict[str, str] = {
+    # "sp500" used to be special-cased to SP500_TOP100, so asking for the S&P
+    # 500 quietly scanned a hundred stocks. The full list already shipped under
+    # its display name; the hundred-name cut is still there as "S&P 500 Top 100".
+    "sp500": "S&P 500",
+    "sp100": "S&P 500 Top 100",
     "russell1000": "Russell 1000",
-    "international": "International EAFE",
-    "emerging": "Emerging Markets",
+    "international": "International ADRs",
+    "emerging": "Emerging Market ADRs",
     "global": "Global All",
 }
 
@@ -426,9 +431,6 @@ def get_universe(name: str = "sp500", asset_class: str | None = None) -> list[st
             return list(universe.keys())
         available_ac = list(_ASSET_CLASS_UNIVERSES.keys())
         raise ValueError(f"Unknown asset_class: {asset_class!r}. Available: {available_ac}")
-
-    if name.lower() == "sp500":
-        return list(SP500_TOP100.keys())
 
     resolved = _UNIVERSE_ALIASES.get(_normalize_universe(name), name)
     preset = UNIVERSE_PRESETS.get(resolved)

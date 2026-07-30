@@ -391,8 +391,8 @@ def render() -> None:
 
         # Build combined preset names (static + extended)
         _EXTENDED_NAMES = [
-            "S&P 500", "Russell 1000", "International EAFE",
-            "Emerging Markets", "Global All",
+            "S&P 500", "Russell 1000", "International ADRs",
+            "Emerging Market ADRs", "Global All",
         ]
         universe_names = list(UNIVERSE_PRESETS.keys()) + _EXTENDED_NAMES
         selected_universe_name = st.selectbox(

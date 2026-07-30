@@ -93,7 +93,7 @@ All 28 commands, which is everything `quant-tools help` lists.
 
 ```bash
 # Scanner
-quant-tools scan [--universe sp500|russell1000|international|emerging|global]
+quant-tools scan [--universe sp500|sp100|russell1000|international|emerging|global]
                  [--sector Technology] [--top-n 20]
                  [--asset-class equity|crypto|forex|commodity|all]
 
@@ -149,10 +149,26 @@ quant-tools help                   # This list
 commands needing credentials in `.env`; see `.env.example`. Everything else works
 on a bare install.
 
-Scanning a large universe fetches prices in bulk, so `russell1000` (922 symbols)
-and `global` (1002) take roughly 70 to 80 seconds rather than the several minutes
-a per-symbol fetch would cost. Tickers the bulk request returns nothing for are
-skipped rather than retried, which is most of that saving.
+### Universes
+
+| Name | Symbols | Scan time | What it is |
+|------|---------|-----------|------------|
+| `sp500` | 518 | ~40s | The S&P 500 |
+| `sp100` | 100 | ~9s | Its 100 largest by market cap, for a quick scan |
+| `russell1000` | 922 | ~70s | The Russell 1000 |
+| `international` | 49 | ~3s | Developed-market **ADRs**, Europe and Asia Pacific |
+| `emerging` | 32 | ~3s | Emerging-market **ADRs** |
+| `global` | 1002 | ~80s | Russell 1000 plus both ADR lists |
+
+The two international lists are US-listed depositary receipts rather than index
+constituents, so they are a liquid sample and not MSCI EAFE or MSCI EM coverage.
+They are named ADRs for that reason.
+
+Prices are fetched in bulk, a hundred symbols per request, so the largest
+universes take roughly 70 to 80 seconds instead of the several minutes a
+per-symbol fetch would cost. These lists are static snapshots, so a few names
+have since been delisted; the scanner skips whatever the bulk request returns no
+data for rather than retrying it.
 
 ## Optional Extras
 

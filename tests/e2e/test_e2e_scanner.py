@@ -22,8 +22,8 @@ EQUITY_UNIVERSES = [
     "S&P 500 Top 100",
     "S&P 500",
     "Russell 1000",
-    "International EAFE",
-    "Emerging Markets",
+    "International ADRs",
+    "Emerging Market ADRs",
 ]
 
 

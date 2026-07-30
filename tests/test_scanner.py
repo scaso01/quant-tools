@@ -40,15 +40,22 @@ class TestUniverse:
         assert len(SP500_TOP100) == 100
 
     def test_get_universe_returns_list(self):
+        # "sp500" resolves to the whole index, not the hundred-name cut it used
+        # to return, which made `scan --universe sp500` quietly scan 100 stocks.
         result = get_universe("sp500")
         assert isinstance(result, list)
-        assert len(result) == 100
+        assert result == get_universe("S&P 500")
+        assert len(result) > 500
         assert "AAPL" in result
         assert "MSFT" in result
 
     def test_get_universe_case_insensitive(self):
-        result = get_universe("SP500")
-        assert len(result) == 100
+        assert get_universe("SP500") == get_universe("sp500")
+
+    def test_sp100_alias_returns_the_top_100(self):
+        """The hundred-name cut is still reachable, under its own name."""
+        assert len(get_universe("sp100")) == 100
+        assert get_universe("sp100") == get_universe("S&P 500 Top 100")
 
     def test_get_universe_unknown_raises(self):
         with pytest.raises(ValueError, match="Unknown universe"):

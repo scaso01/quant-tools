@@ -193,8 +193,8 @@ class TestExtendedPresets:
     def test_extended_presets_registered(self):
         assert "S&P 500" in _EXTENDED_PRESET_BUILDERS
         assert "Russell 1000" in _EXTENDED_PRESET_BUILDERS
-        assert "International EAFE" in _EXTENDED_PRESET_BUILDERS
-        assert "Emerging Markets" in _EXTENDED_PRESET_BUILDERS
+        assert "International ADRs" in _EXTENDED_PRESET_BUILDERS
+        assert "Emerging Market ADRs" in _EXTENDED_PRESET_BUILDERS
         assert "Global All" in _EXTENDED_PRESET_BUILDERS
 
     def test_get_universe_sp500_full(self):
@@ -207,7 +207,7 @@ class TestExtendedPresets:
 
     def test_get_universe_eafe(self):
         """EAFE = Europe + Asia Pacific (no Emerging)."""
-        result = get_universe("International EAFE")
+        result = get_universe("International ADRs")
         assert len(result) >= 30
         # Verify no emerging market tickers leaked in
         intl = load_universe("international")
@@ -219,7 +219,7 @@ class TestExtendedPresets:
                 )
 
     def test_get_universe_emerging(self):
-        result = get_universe("Emerging Markets")
+        result = get_universe("Emerging Market ADRs")
         assert len(result) >= 20
         intl = load_universe("international")
         for sym in result:
@@ -231,10 +231,17 @@ class TestExtendedPresets:
         result = get_universe("Global All")
         assert len(result) >= 1000
 
-    def test_legacy_sp500_still_works(self):
-        """'sp500' (lowercase) must still return the original 100."""
+    def test_sp500_resolves_to_the_full_index(self):
+        """'sp500' means the S&P 500, not the top hundred of it.
+
+        It was special-cased to SP500_TOP100 while the full list sat right
+        beside it, so the documented `--universe sp500` scanned 100 stocks.
+        """
         result = get_universe("sp500")
-        assert len(result) == 100
+        assert result == get_universe("S&P 500")
+        assert len(result) > 500
+        # The hundred-name cut is still available, just not under this name.
+        assert len(get_universe("sp100")) == 100
 
     def test_unknown_universe_lists_extended(self):
         """ValueError message should include extended preset names."""
