@@ -99,6 +99,37 @@ def fetch_prices(
     return df
 
 
+# yfinance returns fund sector keys in its own casing, and every one of them
+# except real estate maps onto an equity's "sector" string with a title-case.
+_FUND_SECTOR_NAMES = {"realestate": "Real Estate"}
+
+
+def _fund_sector_weights(ticker: yf.Ticker, info: dict) -> dict[str, float]:
+    """Sector breakdown for a fund, keyed to match equity sector names.
+
+    An ETF has no ``sector`` of its own, so anything reading that field alone
+    files every fund under "Unknown". Equity funds do publish their underlying
+    sector split, which is the number a portfolio view actually wants.
+
+    Returns an empty dict for anything that is not a fund, and for bond or
+    commodity funds, which have no sectors to report.
+    """
+    if info.get("quoteType") not in ("ETF", "MUTUALFUND"):
+        return {}
+
+    try:
+        raw = ticker.funds_data.sector_weightings or {}
+    except Exception:
+        log.debug("No fund sector weightings for %s", info.get("symbol"), exc_info=True)
+        return {}
+
+    return {
+        _FUND_SECTOR_NAMES.get(key, key.replace("_", " ").title()): float(weight)
+        for key, weight in raw.items()
+        if float(weight) > 0
+    }
+
+
 def fetch_ticker_info(symbol: str) -> dict[str, object]:
     """Fetch ticker metadata (sector, market cap, PE, etc.).
 
@@ -128,6 +159,9 @@ def fetch_ticker_info(symbol: str) -> dict[str, object]:
         "symbol": symbol.upper(),
         "name": info.get("longName", info.get("shortName", symbol)),
         "sector": info.get("sector", ""),
+        "quote_type": info.get("quoteType", ""),
+        "category": info.get("category", ""),
+        "sector_weights": _fund_sector_weights(ticker, info),
         "industry": info.get("industry", ""),
         "market_cap": info.get("marketCap"),
         "pe_ratio": info.get("trailingPE"),

@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from quant_tools.errors import DataError
 from quant_tools.models import PortfolioAnalysis, PortfolioHolding
 from quant_tools.portfolio.analyzer import (
     analyze_portfolio,
@@ -93,12 +94,17 @@ class TestSectorExposure:
         assert exposure["Fixed Income"] == pytest.approx(0.5)
 
     def test_unknown_sector_on_error(self):
-        """Failed ticker info should map to Unknown sector."""
+        """Failed ticker info should map to Unknown sector.
+
+        DataError, not a bare Exception: that is what fetch_ticker_info
+        documents itself as raising, and the handler is now narrow enough that
+        an unexpected error surfaces instead of quietly becoming a slice.
+        """
         holdings = {"FAKE": 1.0}
 
         with patch(
             "quant_tools.portfolio.analyzer.fetch_ticker_info",
-            side_effect=Exception("API error"),
+            side_effect=DataError("API error"),
         ):
             exposure = calculate_sector_exposure(holdings)
 

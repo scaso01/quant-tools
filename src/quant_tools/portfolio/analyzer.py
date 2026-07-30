@@ -54,12 +54,44 @@ def calculate_correlation_matrix(
     return matrix
 
 
+def _sector_split(symbol: str) -> dict[str, float]:
+    """How one holding's weight divides across sectors, as fractions summing to 1.
+
+    A stock is all one sector. An equity fund is spread across the sectors it
+    holds, so a portfolio of index funds gets a real breakdown rather than a
+    single "Unknown" slice. Bond and commodity funds have no sectors at all, so
+    they fall back to the fund category, which at least names what they are.
+    """
+    try:
+        info = fetch_ticker_info(symbol)
+    except DataError as exc:
+        # Narrower than the bare `except Exception` this replaced: a delisted or
+        # misspelled symbol should cost one slice, a real bug should surface.
+        log.debug("Could not fetch sector for %s, using Unknown: %s", symbol, exc)
+        return {"Unknown": 1.0}
+
+    sector = info.get("sector") or ""
+    if sector:
+        return {str(sector): 1.0}
+
+    fund_sectors = info.get("sector_weights") or {}
+    if fund_sectors:
+        # Published weightings are rounded and need not total exactly 1.
+        total = sum(fund_sectors.values())
+        if total > 0:
+            return {name: w / total for name, w in fund_sectors.items()}
+
+    category = info.get("category") or ""
+    return {str(category) if category else "Unknown": 1.0}
+
+
 def calculate_sector_exposure(
     holdings: dict[str, float],
 ) -> dict[str, float]:
     """Calculate portfolio sector exposure by weight.
 
-    Fetches ticker info for each holding to determine sector.
+    Fetches ticker info for each holding to determine sector. Funds are broken
+    out into their underlying sectors rather than counted as one opaque slice.
 
     Args:
         holdings: Mapping of symbol to portfolio weight.
@@ -70,14 +102,8 @@ def calculate_sector_exposure(
     sector_weights: dict[str, float] = {}
 
     for symbol, weight in holdings.items():
-        try:
-            info = fetch_ticker_info(symbol)
-            sector = info.get("sector", "Unknown") or "Unknown"
-        except (DataError, Exception):
-            log.debug("Could not fetch sector for %s, using Unknown", symbol)
-            sector = "Unknown"
-
-        sector_weights[sector] = sector_weights.get(sector, 0.0) + weight
+        for sector, share in _sector_split(symbol).items():
+            sector_weights[sector] = sector_weights.get(sector, 0.0) + weight * share
 
     return sector_weights
 
