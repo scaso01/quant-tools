@@ -1,6 +1,6 @@
 """GDELT event database client for geopolitical event monitoring.
 
-Uses the gdeltPyR library to query the GDELT 2.0 event database.
+Uses the gdelt library to query the GDELT 2.0 event database.
 GDELT monitors broadcast, print, and web news from nearly every country
 and translates events into 300+ categories.
 """
@@ -23,23 +23,23 @@ _breaker = CircuitBreaker("gdelt", threshold=3, recovery_seconds=90.0)
 class GdeltClient:
     """Fetch geopolitical events and sentiment from the GDELT database.
 
-    Requires gdeltPyR: ``pip install gdeltPyR``
+    Requires gdelt: ``pip install gdelt``
     """
 
     def __init__(self) -> None:
-        self._gd = None  # lazy-loaded gdeltPyR.gdelt instance
+        self._gd = None  # lazy-loaded gdelt.gdelt instance
 
     def _ensure_client(self) -> None:
-        """Lazy-initialize the gdeltPyR client."""
+        """Lazy-initialize the gdelt client."""
         if self._gd is not None:
             return
         try:
-            from gdeltPyR import gdelt as gdelt_module
+            from gdelt import gdelt as gdelt_module
 
             self._gd = gdelt_module(version=2)
         except ImportError:
             raise DataError(
-                "gdeltPyR not installed. pip install gdeltPyR"
+                "gdelt not installed. pip install gdelt"
             )
 
     def fetch_events(
@@ -75,7 +75,7 @@ class GdeltClient:
             end_date = datetime.now().strftime("%Y-%m-%d")
 
         try:
-            # gdeltPyR expects dates as 'YYYY Mon DD' or similar
+            # gdelt expects dates as 'YYYY Mon DD' or similar
             start_fmt = datetime.strptime(start_date, "%Y-%m-%d").strftime(
                 "%Y %b %d"
             )

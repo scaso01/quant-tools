@@ -371,6 +371,35 @@ _ASSET_CLASS_UNIVERSES: dict[str, dict[str, str]] = {
 }
 
 
+# The presets are keyed by display name ("Russell 1000"), but "sp500" was
+# special-cased to lowercase, so the short forms the README documents were the
+# only spellings a reader would try and the only ones that did not work. These
+# map each documented short name onto the preset it refers to.
+_UNIVERSE_ALIASES: dict[str, str] = {
+    "russell1000": "Russell 1000",
+    "international": "International EAFE",
+    "emerging": "Emerging Markets",
+    "global": "Global All",
+}
+
+# Short forms people actually type for the GICS sector names.
+_SECTOR_ALIASES: dict[str, str] = {
+    "tech": "Technology",
+    "healthcare": "Healthcare",
+    "financials": "Financials",
+    "energy": "Energy",
+}
+
+
+def _normalize_universe(name: str) -> str:
+    """Fold a universe name to a comparable key.
+
+    Lets "Growth & Tech", "growth & tech" and "growthtech" all find the same
+    preset, so capitalisation and punctuation stop being a guessing game.
+    """
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
 # ── Public API ──────────────────────────────────────────────────────────
 
 
@@ -400,13 +429,25 @@ def get_universe(name: str = "sp500", asset_class: str | None = None) -> list[st
 
     if name.lower() == "sp500":
         return list(SP500_TOP100.keys())
-    preset = UNIVERSE_PRESETS.get(name)
+
+    resolved = _UNIVERSE_ALIASES.get(_normalize_universe(name), name)
+    preset = UNIVERSE_PRESETS.get(resolved)
     if preset is not None:
         return list(preset.symbols)
-    extended = _get_extended_preset(name)
+    extended = _get_extended_preset(resolved)
     if extended is not None:
         return list(extended.symbols)
+
+    # Fall back to a punctuation- and case-insensitive match before giving up.
+    wanted = _normalize_universe(resolved)
+    for key in list(UNIVERSE_PRESETS) + list(_EXTENDED_PRESET_BUILDERS):
+        if _normalize_universe(key) == wanted:
+            preset = UNIVERSE_PRESETS.get(key) or _get_extended_preset(key)
+            if preset is not None:
+                return list(preset.symbols)
+
     available = ["sp500"] + list(UNIVERSE_PRESETS.keys()) + list(_EXTENDED_PRESET_BUILDERS.keys())
+    available += sorted(_UNIVERSE_ALIASES)
     raise ValueError(f"Unknown universe: {name!r}. Available: {available}")
 
 
@@ -423,6 +464,13 @@ def get_sector_tickers(sector: str) -> list[str]:
         ValueError: If the sector is not recognized.
     """
     tickers = SECTOR_MAP.get(sector)
+    if tickers is None:
+        # "technology" and "Real Estate" vs "realestate" should not be a guessing
+        # game either, and "Tech" is what most people type for Technology.
+        wanted = _normalize_universe(_SECTOR_ALIASES.get(sector.lower(), sector))
+        for key, value in SECTOR_MAP.items():
+            if _normalize_universe(key) == wanted:
+                return list(value)
     if tickers is None:
         available = sorted(SECTOR_MAP.keys())
         raise ValueError(f"Unknown sector: {sector!r}. Available: {available}")

@@ -120,8 +120,16 @@ class MarketAnalyzer:
                     },
                 )
                 resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+                # Some local models end their turn immediately on this system
+                # prompt and return a completion with no text. That came back as
+                # a successful empty analysis, so the command printed a heading
+                # and nothing else. Treat it as a failed call so the caller falls
+                # back to the deterministic summary.
+                if not content or not content.strip():
+                    raise NetworkError("Analysis LLM returned an empty completion")
                 _breaker.record_success()
-                return resp.json()["choices"][0]["message"]["content"]
+                return content
         except Exception as exc:
             _breaker.record_failure()
             raise NetworkError(f"Analysis LLM error: {exc}") from exc

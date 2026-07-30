@@ -5,6 +5,7 @@ All external APIs are mocked. No real network calls.
 
 from __future__ import annotations
 
+from collections import namedtuple
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -167,13 +168,15 @@ class TestFearGreedClient:
     @patch("quant_tools.data.alternative.fear_greed.FearGreedClient._ensure_cnn_client")
     def test_fetch_cnn_index_success(self, mock_ensure) -> None:
         """Test successful CNN Fear & Greed fetch."""
+        # A MagicMock answers to any attribute, so the old version of this test
+        # invented a `previous_close` the real library has never returned and
+        # passed while the command failed. fear-and-greed returns exactly this
+        # namedtuple, so use it and let a shape change break the test.
+        FearGreedIndex = namedtuple("FearGreedIndex", ["value", "description", "last_update"])
         mock_module = MagicMock()
-        mock_result = MagicMock()
-        mock_result.value = 65.5
-        mock_result.description = "Greed"
-        mock_result.previous_close = 62.0
-        mock_result.last_update = "2025-01-15T12:00:00Z"
-        mock_module.get.return_value = mock_result
+        mock_module.get.return_value = FearGreedIndex(
+            value=65.5, description="Greed", last_update="2025-01-15T12:00:00Z"
+        )
 
         client = FearGreedClient()
         client._cnn_client = mock_module
@@ -182,8 +185,8 @@ class TestFearGreedClient:
         assert isinstance(result, dict)
         assert result["score"] == 65.5
         assert result["rating"] == "Greed"
-        assert result["previous_close"] == 62.0
-        assert "last_update" in result
+        assert result["last_update"] == "2025-01-15T12:00:00Z"
+        assert "previous_close" not in result
 
     @patch("quant_tools.data.alternative.fear_greed.FearGreedClient._ensure_cnn_client")
     def test_fetch_cnn_index_network_error(self, mock_ensure) -> None:

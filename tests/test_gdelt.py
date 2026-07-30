@@ -95,16 +95,16 @@ class TestGdeltClient:
             client.fetch_events("AAPL")
 
     def test_library_not_installed(self) -> None:
-        """Test graceful error when gdeltPyR missing."""
+        """Test graceful error when the gdelt library is missing."""
         client = GdeltClient()
         client._gd = None  # force re-import
 
-        with patch.dict("sys.modules", {"gdeltPyR": None}):
+        with patch.dict("sys.modules", {"gdelt": None}):
             with patch(
                 "builtins.__import__",
-                side_effect=ImportError("No module named 'gdeltPyR'"),
+                side_effect=ImportError("No module named 'gdelt'"),
             ):
-                with pytest.raises(DataError, match="gdeltPyR not installed"):
+                with pytest.raises(DataError, match="gdelt not installed"):
                     client._ensure_client()
 
     @patch("quant_tools.data.alternative.gdelt.GdeltClient._ensure_client")

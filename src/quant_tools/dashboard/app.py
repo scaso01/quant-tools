@@ -217,7 +217,10 @@ if not st.session_state.get("onboarding_dismissed"):
 from quant_tools.dashboard.core.command_bar import parse_command
 
 _cmd_input = st.text_input(
-    "",
+    # An empty label logs an accessibility warning on every rerun, and streamlit
+    # says it may start raising instead. The label is already collapsed, so
+    # naming it costs nothing visually and gives screen readers something.
+    "Command bar",
     placeholder="Type / for commands or search symbols... (press /)",
     key="command_bar",
     label_visibility="collapsed",

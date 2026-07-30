@@ -75,7 +75,13 @@ class SecEdgarClient:
             from sec_edgar_downloader import Downloader
 
             with tempfile.TemporaryDirectory() as tmpdir:
-                dl = Downloader(self._email, tmpdir)
+                # The signature is (company_name, email_address, download_folder).
+                # Passing two arguments sent the temp directory as the SEC
+                # user-agent email and left download_folder unset, so the filings
+                # landed in whatever directory the user happened to run from
+                # while the code kept looking inside tmpdir and reported that
+                # nothing was found.
+                dl = Downloader("quant-tools", self._email, tmpdir)
                 dl.get(filing_type, ticker, limit=num_filings)
 
                 filings_dir = Path(tmpdir) / "sec-edgar-filings" / ticker / filing_type

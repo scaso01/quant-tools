@@ -70,6 +70,22 @@ def main(argv: list[str] | None = None) -> int:
         print("Error: --holdings must contain at least one symbol", file=sys.stderr)
         return 1
 
+    # Weights are read as fractions of the portfolio, so a set that sums to 1.8
+    # produced a return figure that looked ordinary and was not. Say so rather
+    # than silently reporting a number nobody can act on.
+    total_weight = sum(holdings.values())
+    if any(w < 0 for w in holdings.values()):
+        print("Error: --holdings weights cannot be negative", file=sys.stderr)
+        return 1
+    if abs(total_weight - 1.0) > 0.01:
+        print(
+            f"Error: --holdings weights sum to {total_weight:.2f}, expected 1.0. "
+            "Give each symbol its fraction of the portfolio, for example "
+            "'{\"AAPL\":0.6,\"BND\":0.4}'.",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
         # Run portfolio analysis
         result = analyze_portfolio(holdings, period=args.period)

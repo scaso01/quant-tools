@@ -79,7 +79,8 @@ reports = [
     "fpdf2>=2.7.0",
 ]
 alt-data = [
-    "gdeltPyR>=0.1.0",
+    # Published on PyPI as "gdelt"; gdeltPyR is only the repo name.
+    "gdelt>=0.1.14",
     "pytrends>=4.9.0",
     # dbnomics removed — AGPL-3.0; module uses httpx REST API directly
     "mwviews>=0.1.0",

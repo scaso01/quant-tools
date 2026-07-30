@@ -88,8 +88,13 @@ class PortfolioQueryEngine:
                     },
                 )
                 resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+                # An empty completion is a failed answer, not an answer. Saying
+                # so beats handing the user a blank line and calling it success.
+                if not content or not content.strip():
+                    raise NetworkError("LLM returned an empty completion")
                 _breaker.record_success()
-                return resp.json()["choices"][0]["message"]["content"]
+                return content
         except Exception as exc:
             _breaker.record_failure()
             raise NetworkError(f"LLM error: {exc}") from exc

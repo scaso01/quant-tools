@@ -122,8 +122,7 @@ class FearGreedClient:
         """Fetch the CNN Fear & Greed Index (current snapshot).
 
         Returns:
-            Dict with keys: score (0-100), rating (str),
-            previous_close (float), last_update (str).
+            Dict with keys: score (0-100), rating (str), last_update (str).
 
         Raises:
             DataError: If library missing or fetch fails.
@@ -140,10 +139,12 @@ class FearGreedClient:
             result = self._cnn_client.get()
 
             _breaker.record_success()
+            # fear-and-greed returns a namedtuple of exactly
+            # (value, description, last_update). Reading previous_close off it
+            # raised AttributeError, which surfaced as a fetch failure.
             output = {
                 "score": float(result.value),
                 "rating": str(result.description),
-                "previous_close": float(result.previous_close),
                 "last_update": str(result.last_update),
             }
             logger.info(
