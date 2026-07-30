@@ -89,10 +89,12 @@ The AI Analysis page needs an OpenAI-compatible server on `http://localhost:8080
 
 ## CLI Reference
 
+All 28 commands, which is everything `quant-tools help` lists.
+
 ```bash
 # Scanner
 quant-tools scan [--universe sp500|russell1000|international|emerging|global]
-                 [--sector Tech] [--top-n 20]
+                 [--sector Technology] [--top-n 20]
                  [--asset-class equity|crypto|forex|commodity|all]
 
 # Backtesting
@@ -109,16 +111,62 @@ quant-tools predict AAPL [--horizon 5] [--asset-class equity]
 quant-tools predict BTC/USDT --asset-class crypto
 quant-tools track [--symbol AAPL] [--model gradient_boost] [--limit 20]
 quant-tools resolve                # Score pending predictions against outcomes
+quant-tools clear                  # Delete stored predictions
+quant-tools benchmark-models --symbols AAPL MSFT [--horizon 5]
+
+# Risk
+quant-tools risk --holdings '{"AAPL":0.5,"BND":0.5}' [--confidence 0.95]
+quant-tools stress-test --holdings '{"AAPL":0.5,"BND":0.5}' [--scenario 2008_gfc]
+quant-tools regime [--ticker SPY] [--period 5y] [--regimes 3]
 
 # Data tools
 quant-tools filings AAPL --type 10-K --count 5          # SEC EDGAR
-quant-tools sentiment AAPL                              # Reddit sentiment
+quant-tools sentiment AAPL                              # Reddit sentiment    [keys]
 quant-tools macro US --indicator gdp --range 2010:2025  # World Bank macro
+quant-tools news 'AAPL earnings' [--days 30]            # GDELT              [alt-data]
+quant-tools trends AAPL MSFT [--timeframe 'today 3-m']  # Google Trends      [alt-data]
+quant-tools defi [--top 10] [--chain Ethereum]          # DeFi Llama yields
+quant-tools defi --protocol aave                        # One protocol's TVL history
+quant-tools fear-greed [--market crypto|equity]         # equity needs        [alt-data]
+quant-tools options AAPL [--expiry 2026-01-16]          # Chain, put/call, max pain
+
+# AI (needs an OpenAI-compatible server on localhost:8080)
+quant-tools analyze AAPL [--depth quick|deep]
+quant-tools ask 'What is my biggest risk' --holdings '{"AAPL":0.5,"BND":0.5}'
+
+# Reporting and execution
+quant-tools tearsheet --holdings '{"AAPL":0.5,"BND":0.5}' [--output tearsheet.html]
+quant-tools paper-trade status|positions                 # Alpaca             [keys]
+quant-tools paper-trade buy --symbol BTC-USD --qty 0.1 --provider crypto
 
 # Interfaces
 quant-tools web                    # Streamlit dashboard
 quant-tools dashboard              # Terminal UI
+quant-tools help                   # This list
 ```
+
+`[alt-data]` marks commands needing `pip install -e ".[alt-data]"`. `[keys]` marks
+commands needing credentials in `.env`; see `.env.example`. Everything else works
+on a bare install.
+
+Scanning a large universe fetches prices in bulk, so `russell1000` (922 symbols)
+and `global` (1002) take roughly 70 to 80 seconds rather than the several minutes
+a per-symbol fetch would cost. Tickers the bulk request returns nothing for are
+skipped rather than retried, which is most of that saving.
+
+## Optional Extras
+
+| Extra | Install | Unlocks |
+|-------|---------|---------|
+| `ml` | `pip install -e ".[ml]"` | The prediction ensemble. Python 3.11 to 3.13 |
+| `alt-data` | `pip install -e ".[alt-data]"` | `news`, `trends`, `fear-greed --market equity` |
+| `foundation` | `pip install -e ".[foundation]"` | Chronos, TimesFM and Moirai forecasters |
+| `realtime` | `pip install -e ".[realtime]"` | Alpaca paper trading, websocket feeds |
+| `reports` | `pip install -e ".[reports]"` | PDF output helpers |
+| `nlp` | `pip install -e ".[nlp]"` | Transformer sentiment models |
+| `docs` | `pip install -e ".[docs]"` | Docling PDF and DOCX parsing |
+| `e2e` | `pip install -e ".[e2e]"` | Playwright browser tests |
+| `dev` | `pip install -e ".[dev]"` | pytest and pyflakes |
 
 ## Prediction Engine
 

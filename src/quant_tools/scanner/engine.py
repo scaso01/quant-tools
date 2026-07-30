@@ -5,9 +5,12 @@ from __future__ import annotations
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # yf.download is not thread-safe — serialize price fetches
 _download_lock = threading.Lock()
@@ -41,12 +44,78 @@ _PRICE_SIGNALS = {SignalType.MOMENTUM, SignalType.MEAN_REVERSION}
 _INFO_SIGNALS = {SignalType.VALUE, SignalType.QUALITY}
 
 
+def _prefetch_prices(
+    symbols: list[str], period: str
+) -> tuple[dict[str, "pd.DataFrame"], set[str]]:
+    """Download daily bars for many symbols in as few requests as possible.
+
+    Every worker used to call yf.download for one symbol while holding the
+    global lock below, so the thread pool was concurrent in name only and a
+    922-symbol universe took over ten minutes of round trips. yfinance accepts a
+    list and fetches them together, which turns that into a handful of requests.
+
+    Returns ``(frames, covered)``. ``covered`` is every symbol that was part of a
+    request that came back, whether or not it had data, so the caller can tell
+    "Yahoo has nothing for this ticker" apart from "this request never ran" and
+    skip re-asking for symbols already known to be dead.
+    """
+    import pandas as pd
+    import yfinance as yf
+
+    out: dict[str, pd.DataFrame] = {}
+    covered: set[str] = set()
+    # Chunked so one enormous URL cannot fail the whole scan, and so a partial
+    # failure costs one chunk rather than everything.
+    chunk_size = 100
+    requests = 0
+    for i in range(0, len(symbols), chunk_size):
+        chunk = symbols[i:i + chunk_size]
+        requests += 1
+        try:
+            with _download_lock:
+                raw = yf.download(
+                    chunk, period=period, group_by="ticker",
+                    progress=False, threads=True, auto_adjust=True,
+                )
+        except Exception:
+            log.warning("Batch price prefetch failed for %d symbols", len(chunk), exc_info=True)
+            continue
+
+        if raw is None or raw.empty:
+            continue
+
+        covered.update(chunk)
+        for symbol in chunk:
+            try:
+                if isinstance(raw.columns, pd.MultiIndex):
+                    if symbol not in raw.columns.get_level_values(0):
+                        continue
+                    df = raw[symbol]
+                else:
+                    # A single-symbol chunk comes back without the ticker level.
+                    df = raw
+                df = df.dropna(how="all")
+                if not df.empty and "Close" in df.columns:
+                    out[symbol] = df
+            except Exception:
+                log.debug("Could not split prefetched frame for %s", symbol, exc_info=True)
+
+    dead = len(covered) - len(out)
+    log.info(
+        "Prefetched %d/%d symbols in %d request(s); %d had no data and will be skipped",
+        len(out), len(symbols), requests, dead,
+    )
+    return out, covered
+
+
 def _scan_single(
     symbol: str,
     signals: list[SignalType],
     period: str = "1y",
     asset_class: AssetClass | None = None,
     interval: str = "1d",
+    prefetched: "pd.DataFrame | None" = None,
+    known_empty: bool = False,
 ) -> ScanResult | None:
     """Scan a single symbol. Returns None on failure.
 
@@ -56,10 +125,21 @@ def _scan_single(
         period: Price history period (default "1y").
         asset_class: Optional asset class. When non-EQUITY, uses
             asset-specific signal functions.
+        prefetched: Bars already downloaded in bulk. When given, the per-symbol
+            download is skipped.
+        known_empty: The bulk download covered this symbol and Yahoo returned
+            nothing for it, so there is no point asking again.
 
     Returns:
         ScanResult or None if the symbol could not be scanned.
     """
+    if known_empty:
+        # Delisted tickers linger in the bigger index lists. Retrying each one
+        # individually cost three attempts with exponential backoff apiece,
+        # which was most of the wall clock on a Russell 1000 scan.
+        log.debug("Skipping %s: bulk download returned no data", symbol)
+        return None
+
     try:
         needs_prices = any(s in _PRICE_SIGNALS for s in signals)
         needs_info = any(s in _INFO_SIGNALS for s in signals)
@@ -84,6 +164,8 @@ def _scan_single(
                 registry = ProviderRegistry()
                 with _download_lock:
                     df = registry.fetch_ohlcv(symbol, period=period, interval=interval)
+            elif prefetched is not None:
+                df = prefetched
             else:
                 with _download_lock:
                     df = fetch_prices(symbol, period=period)
@@ -229,9 +311,20 @@ def scan_universe(
 
     results: list[ScanResult] = []
 
+    # Only the plain equity daily path goes through fetch_prices; the other
+    # branches use the provider registry, which this cannot batch.
+    prefetched: dict = {}
+    covered: set[str] = set()
+    needs_prices = any(s in _PRICE_SIGNALS for s in signals)
+    if needs_prices and interval == "1d" and asset_class in (None, AssetClass.EQUITY):
+        prefetched, covered = _prefetch_prices(symbols, period)
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_symbol = {
-            executor.submit(_scan_single, sym, signals, period, asset_class, interval): sym
+            executor.submit(
+                _scan_single, sym, signals, period, asset_class, interval,
+                prefetched.get(sym), sym in covered and sym not in prefetched,
+            ): sym
             for sym in symbols
         }
 
