@@ -577,7 +577,12 @@ def _cmd_dashboard(args: list[str]) -> None:
 
 
 def _cmd_web(args: list[str]) -> None:
-    """Launch the Streamlit web dashboard."""
+    """Launch the Streamlit web dashboard.
+
+    Args:
+        args: Extra streamlit options, e.g. ["--server.port", "8599"]. Anything
+            given here replaces the matching default below.
+    """
     import subprocess
     from pathlib import Path
 
@@ -587,16 +592,29 @@ def _cmd_web(args: list[str]) -> None:
     # no theme at all: light chrome around this app's dark cards, with headings
     # rendering dark on dark. Pass the theme explicitly so it holds everywhere.
     # Values match dashboard/core/colors.py and .streamlit/config.toml.
+    defaults = {
+        "--server.headless": "false",
+        "--browser.gatherUsageStats": "false",
+        "--client.toolbarMode": "minimal",
+        "--theme.base": "dark",
+        "--theme.primaryColor": "#3b82f6",
+        "--theme.backgroundColor": "#0e1117",
+        "--theme.secondaryBackgroundColor": "#1c2128",
+        "--theme.textColor": "#f8fafc",
+    }
+
+    # args used to be dropped on the floor, so the documented
+    # "quant-tools web --server.port 8599" silently started on 8501, and
+    # --server.headless could not be turned on at all. Drop any default the
+    # caller has overridden rather than passing the same flag twice.
+    overridden = {a.split("=", 1)[0] for a in args if a.startswith("--")}
+    flags: list[str] = []
+    for flag, value in defaults.items():
+        if flag not in overridden:
+            flags += [flag, value]
+
     subprocess.run(
-        [sys.executable, "-m", "streamlit", "run", str(app),
-         "--server.headless", "false",
-         "--browser.gatherUsageStats", "false",
-         "--client.toolbarMode", "minimal",
-         "--theme.base", "dark",
-         "--theme.primaryColor", "#3b82f6",
-         "--theme.backgroundColor", "#0e1117",
-         "--theme.secondaryBackgroundColor", "#1c2128",
-         "--theme.textColor", "#f8fafc"],
+        [sys.executable, "-m", "streamlit", "run", str(app), *flags, *args],
     )
 
 

@@ -111,6 +111,25 @@ class TestWritersCreateTheirDirectory:
         CacheManager(str(db))
         assert db.exists()
 
+    def test_unwritable_log_path_names_the_setting(self, tmp_path):
+        """An old .env still points at a relative path. Say so, do not traceback."""
+        from quant_tools.errors import ConfigError
+        from quant_tools.logging_config import setup_logging
+
+        blocker = tmp_path / "not-a-dir"
+        blocker.write_text("this is a file, so it cannot hold a log file")
+
+        logger = logging.getLogger("quant_tools")
+        saved = logger.handlers[:]
+        logger.handlers = []
+        try:
+            with pytest.raises(ConfigError, match="LOG_FILE"):
+                setup_logging(str(blocker / "quant_tools.log"))
+        finally:
+            for h in logger.handlers:
+                h.close()
+            logger.handlers = saved
+
     def test_logging_creates_missing_parent(self, tmp_path):
         from quant_tools.logging_config import setup_logging
 
