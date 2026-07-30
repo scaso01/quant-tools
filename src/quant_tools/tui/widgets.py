@@ -61,7 +61,9 @@ class BacktestPanel(Static):
 
         lines = [
             f"[b]Backtest: {result.ticker} ({result.strategy.value})[/b]",
-            f"  Period: {result.start_date} to {result.end_date}",
+            f"  Period: {result.start_date} to {result.end_date}"
+            if result.start_date and result.end_date
+            else "  Period: [dim]not recorded[/dim]",
             f"  Capital: {fmt_currency(result.initial_capital)} -> {fmt_currency(result.final_value)}",
             f"  Return: [{ret_color}]{fmt_pct(result.total_return)}[/{ret_color}]  "
             f"CAGR: {fmt_pct(result.cagr)}",

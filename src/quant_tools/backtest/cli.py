@@ -74,6 +74,10 @@ def backtest_command(args: list[str] | None = None) -> BacktestResult:
         initial_capital=parsed.capital,
         strategy=strategy_type,
         ticker=parsed.ticker.upper(),
+        # The window the data actually covers, which is not necessarily the one
+        # asked for: a request before the listing date starts at the listing.
+        start_date=df.index[0].date(),
+        end_date=df.index[-1].date(),
         params=params,
     )
 
@@ -86,7 +90,10 @@ def _print_result(result: BacktestResult) -> None:
     """Print a formatted backtest result summary."""
     print(f"\n{'='*50}")
     print(f"  Backtest: {result.strategy.value} on {result.ticker}")
-    print(f"  {result.start_date} -> {result.end_date}")
+    if result.start_date and result.end_date:
+        print(f"  {result.start_date} -> {result.end_date}")
+    else:
+        print("  (date range not recorded)")
     print(f"{'='*50}")
     print(f"  Initial Capital:  ${result.initial_capital:>12,.2f}")
     print(f"  Final Value:      ${result.final_value:>12,.2f}")

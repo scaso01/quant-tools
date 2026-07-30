@@ -186,8 +186,11 @@ class BacktestResult:
     """Results from a backtest run."""
     strategy: StrategyType
     ticker: str
-    start_date: date
-    end_date: date
+    # None when the caller ran the engine on a bare price array and did not say
+    # what window it covers. The engine cannot infer it, and inventing a date
+    # here once had every CLI backtest reporting a window it had not run.
+    start_date: date | None
+    end_date: date | None
     initial_capital: float
     final_value: float
     total_return: float

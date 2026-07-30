@@ -57,7 +57,9 @@ def run_backtest(
     n = len(close)
 
     if n < 2:
-        return _empty_result(strategy, ticker, initial_capital, start_date, end_date, params)
+        return _empty_result(
+            strategy, ticker, initial_capital, start_date, end_date, params
+        )
 
     # Step 1: Daily returns from close prices
     daily_returns = np.diff(close) / close[:-1]  # length n-1
@@ -95,8 +97,8 @@ def run_backtest(
     return BacktestResult(
         strategy=strategy,
         ticker=ticker,
-        start_date=start_date or date(2020, 1, 1),
-        end_date=end_date or date(2020, 12, 31),
+        start_date=start_date,
+        end_date=end_date,
         initial_capital=initial_capital,
         final_value=float(equity_curve[-1]),
         total_return=total_ret,
@@ -172,8 +174,8 @@ def _empty_result(
     return BacktestResult(
         strategy=strategy,
         ticker=ticker,
-        start_date=start_date or date(2020, 1, 1),
-        end_date=end_date or date(2020, 12, 31),
+        start_date=start_date,
+        end_date=end_date,
         initial_capital=initial_capital,
         final_value=initial_capital,
         total_return=0.0,

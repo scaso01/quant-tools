@@ -47,6 +47,12 @@ def fetch_prices(
     start_str = str(start) if start else None
     end_str = str(end) if end else None
 
+    # A one-sided range used to fall through to `period` below, so
+    # `fetch_prices(sym, start="2020-01-01")` quietly returned the last year and
+    # threw the start date away. Fill in the open end rather than ignore it.
+    if start_str and not end_str:
+        end_str = date.today().isoformat()
+
     # Check cache
     if start_str and end_str:
         cached = _cache.get_prices(symbol, start_str, end_str)
@@ -59,7 +65,7 @@ def fetch_prices(
             return df
 
     try:
-        if start_str and end_str:
+        if start_str or end_str:
             df = yf.download(symbol, start=start_str, end=end_str, progress=False)
         else:
             df = yf.download(symbol, period=period, progress=False)
