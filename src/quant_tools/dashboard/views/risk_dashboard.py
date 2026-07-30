@@ -173,7 +173,7 @@ def render() -> None:
         )
 
         run_analysis = st.button(
-            "Analyze Risk", type="primary", key="risk_run", use_container_width=True
+            "Analyze Risk", type="primary", key="risk_run", width="stretch"
         )
 
     # Nothing is fetched until asked, matching Scanner's "Run Scan" and
@@ -305,7 +305,7 @@ def render() -> None:
                 f"CVaR ({confidence:.0%})": "{:.2%}",
             }
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     # \u2500\u2500 Drawdown chart \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -330,7 +330,7 @@ def render() -> None:
         xaxis_title="Date", yaxis_title="Drawdown",
     )
     dd_fig.update_yaxes(tickformat=".0%")
-    st.plotly_chart(dd_fig, use_container_width=True)
+    st.plotly_chart(dd_fig, width="stretch")
 
     # \u2500\u2500 Correlation heatmap \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     if len(returns_df.columns) > 1:
@@ -349,7 +349,7 @@ def render() -> None:
             )
         )
         heat.update_layout(**PLOTLY_LAYOUT, title="Holding correlation")
-        st.plotly_chart(heat, use_container_width=True)
+        st.plotly_chart(heat, width="stretch")
     else:
         st.info(
             "Correlation needs at least two holdings with overlapping history."

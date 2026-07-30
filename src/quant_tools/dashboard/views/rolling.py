@@ -141,7 +141,7 @@ def render() -> None:
         )
 
         run_analysis = st.button(
-            "Run Analysis", type="primary", key="roll_run", use_container_width=True
+            "Run Analysis", type="primary", key="roll_run", width="stretch"
         )
 
     # Rendered before the fetch so the page always states what it is analyzing,
@@ -229,7 +229,7 @@ def render() -> None:
             _line_chart(
                 sharpe, f"{symbol} Rolling Sharpe Ratio", ACCENT_GREEN, "Sharpe"
             ),
-            use_container_width=True,
+            width="stretch",
         )
     if not volatility.empty:
         st.plotly_chart(
@@ -239,14 +239,14 @@ def render() -> None:
                 ACCENT_AMBER,
                 "Volatility",
             ),
-            use_container_width=True,
+            width="stretch",
         )
     if not beta.empty:
         st.plotly_chart(
             _line_chart(
                 beta, f"{symbol} Rolling Beta vs {benchmark}", ACCENT_BLUE, "Beta"
             ),
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info(

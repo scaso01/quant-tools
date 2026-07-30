@@ -131,7 +131,7 @@ with st.sidebar:
         for _fav_sym in _favs:
             if st.button(
                 f"\u2605 {_fav_sym}",
-                use_container_width=True,
+                width="stretch",
                 key=f"fav_{_fav_sym}",
             ):
                 set_active_symbol(_fav_sym)
@@ -161,7 +161,7 @@ with st.sidebar:
             btn_type = "primary" if is_active else "secondary"
             if st.button(
                 label,
-                use_container_width=True,
+                width="stretch",
                 type=btn_type,
                 key=f"nav_{pg}",
             ):
@@ -179,11 +179,11 @@ with st.sidebar:
     )
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("? Guide", use_container_width=True, key="sidebar_guide"):
+        if st.button("? Guide", width="stretch", key="sidebar_guide"):
             st.session_state["show_guide"] = True
             st.rerun()
     with col2:
-        if st.button("Clear Cache", use_container_width=True, key="clear_cache"):
+        if st.button("Clear Cache", width="stretch", key="clear_cache"):
             from quant_tools.dashboard.core.cache import clear_cache
 
             clear_cache()

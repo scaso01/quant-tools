@@ -123,7 +123,7 @@ def _build_factor_bar_chart(scores: list[FactorScore]) -> None:
         )
     )
     fig.update_layout(barmode="group", title="Factor Z-Scores (Top 10)", **PLOTLY_LAYOUT)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _build_sector_pie(scores: list[FactorScore]) -> None:
@@ -143,7 +143,7 @@ def _build_sector_pie(scores: list[FactorScore]) -> None:
         title="Sector Distribution",
     )
     fig.update_layout(**PLOTLY_LAYOUT)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _build_tilt_chart(rec: RebalanceRecommendation) -> None:
@@ -190,7 +190,7 @@ def _build_tilt_chart(rec: RebalanceRecommendation) -> None:
         title="Regime Factor Tilts",
         **PLOTLY_LAYOUT,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 # ── Main render ──────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ def render() -> None:
         has_fred_key = bool(cfg.fred_api_key)
         detect_btn = st.button(
             "Detect Regime",
-            use_container_width=True,
+            width="stretch",
             disabled=not has_fred_key,
             key="factors_detect_regime",
         )
@@ -318,7 +318,7 @@ def render() -> None:
 
         calc_btn = st.button(
             "Calculate Factors",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             key="factors_calculate",
         )
@@ -489,7 +489,7 @@ def render() -> None:
                 "Composite Z": "{:+.2f}",
             }
         ),
-        use_container_width=True,
+        width="stretch",
         height=min(400, 40 + 35 * len(scores)),
     )
 
@@ -534,7 +534,7 @@ def render() -> None:
 
         st.dataframe(
             picks_df.style.format({"Composite Z": "{:+.2f}"}),
-            use_container_width=True,
+            width="stretch",
             height=min(400, 40 + 35 * len(rec.top_picks)),
         )
 

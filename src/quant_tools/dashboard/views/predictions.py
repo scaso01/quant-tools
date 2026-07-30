@@ -156,7 +156,7 @@ def render() -> None:
             display_df["predicted_magnitude"] = display_df["predicted_magnitude"].apply(
                 lambda x: f"{x:.2%}" if x is not None else "N/A"
             )
-        st.dataframe(display_df, use_container_width=True, height=400)
+        st.dataframe(display_df, width="stretch", height=400)
     else:
         st.info(
             "No predictions match your filters. Generate a new prediction below, "
@@ -180,7 +180,7 @@ def render() -> None:
                 if st.button(
                     "Predict",
                     key=f"pred_example_{ex_sym}",
-                    use_container_width=True,
+                    width="stretch",
                     type="primary",
                 ):
                     from quant_tools.dashboard.core.symbol_state import set_active_symbol
@@ -196,13 +196,13 @@ def render() -> None:
             st.markdown("### Model Agreement")
             fig = _build_model_agreement_chart(filtered)
             if fig:
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         with chart_cols[1]:
             st.markdown("### Confidence Distribution")
             fig = _build_confidence_histogram(filtered)
             if fig:
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
     # -- Clear Predictions --
     st.divider()
@@ -476,7 +476,7 @@ def _build_guidance_summary(tracker) -> None:
                             })
                         st.dataframe(
                             pd.DataFrame(breakdown_data),
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                     else:

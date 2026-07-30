@@ -227,7 +227,7 @@ def render() -> None:
 
         run_clicked = st.button(
             "Run Backtest",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             key="bt_run",
         )
@@ -254,7 +254,7 @@ def render() -> None:
                 if st.button(
                     "Run",
                     key=f"example_{ex_ticker}_{ex_strategy}",
-                    use_container_width=True,
+                    width="stretch",
                     type="primary",
                 ):
                     set_active_symbol(ex_ticker)
@@ -443,7 +443,7 @@ def render() -> None:
         legend={"orientation": "h", "y": -0.15},
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # ── Strategy comparison ───────────────────────────────────────
     with st.expander("Compare All Strategies"):
@@ -512,7 +512,7 @@ def render() -> None:
                 legend={"orientation": "h", "y": -0.2},
             )
 
-            st.plotly_chart(comp_fig, use_container_width=True)
+            st.plotly_chart(comp_fig, width="stretch")
 
             # Summary table
             summary_data = {
@@ -525,7 +525,7 @@ def render() -> None:
                 ],
                 "Trades": [r.total_trades for r in comparison_results],
             }
-            st.dataframe(summary_data, use_container_width=True)
+            st.dataframe(summary_data, width="stretch")
 
         except (DataError, NetworkError, ComputeError) as exc:
             st.warning(f"Could not run comparison: {exc}")

@@ -102,7 +102,7 @@ def render() -> None:
                 "Avg Confidence": "{:.1%}",
                 "Avg Error": "{:.2%}",
             }).background_gradient(subset=["Win Rate"], cmap="RdYlGn"),
-            use_container_width=True,
+            width="stretch",
         )
 
     # -- Charts --
@@ -113,13 +113,13 @@ def render() -> None:
             st.markdown("### Win Rate by Model")
             fig = _build_win_rate_chart(performance)
             if fig:
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         with chart_cols[1]:
             st.markdown("### Win Rate Heatmap")
             fig = _build_heatmap(performance)
             if fig:
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
     # -- Confidence vs Accuracy Scatter --
     resolved = [p for p in all_predictions if p.get("resolved")]
@@ -127,7 +127,7 @@ def render() -> None:
         st.markdown("### Confidence vs Accuracy")
         fig = _build_confidence_accuracy_scatter(resolved)
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # -- Recent Resolved Predictions --
     st.divider()

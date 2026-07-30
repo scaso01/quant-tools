@@ -141,7 +141,7 @@ def render() -> None:
             "Refresh Now",
             type="primary",
             key="live_refresh_now",
-            use_container_width=True,
+            width="stretch",
         )
 
     symbols = parse_watchlist(raw_symbols)
@@ -224,7 +224,7 @@ def render() -> None:
         ).map(
             lambda v: f"color: {directional_color(v)}", subset=["Change"]
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
     st.caption(

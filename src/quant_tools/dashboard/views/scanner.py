@@ -236,7 +236,7 @@ def _build_score_chart(results: list[ScanResult]) -> None:
         title="Score Distribution",
     )
     fig.update_layout(**PLOTLY_LAYOUT)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _build_signal_donut(results: list[ScanResult]) -> None:
@@ -263,7 +263,7 @@ def _build_signal_donut(results: list[ScanResult]) -> None:
         color_discrete_map=color_map,
     )
     fig.update_layout(**PLOTLY_LAYOUT)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _build_treemap(results: list[ScanResult]) -> None:
@@ -325,7 +325,7 @@ def _build_treemap(results: list[ScanResult]) -> None:
     )
 
     # Render the chart and capture click events
-    clicked = st.plotly_chart(fig, use_container_width=True, on_select="rerun",
+    clicked = st.plotly_chart(fig, width="stretch", on_select="rerun",
                               key="scanner_treemap_click")
 
     # Handle click: navigate to backtester with clicked symbol
@@ -507,13 +507,13 @@ def render() -> None:
                 sec_btn_l, sec_btn_r = st.columns(2)
                 with sec_btn_l:
                     if st.button("All", key="scanner_sec_all",
-                                 use_container_width=True):
+                                 width="stretch"):
                         for s in all_sectors:
                             st.session_state[f"scanner_sec_{s}"] = True
                         st.rerun()
                 with sec_btn_r:
                     if st.button("None", key="scanner_sec_none",
-                                 use_container_width=True):
+                                 width="stretch"):
                         for s in all_sectors:
                             st.session_state[f"scanner_sec_{s}"] = False
                         st.rerun()
@@ -574,7 +574,7 @@ def render() -> None:
 
         run_scan = st.button(
             "Run Scan",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             key="scanner_run",
         )
@@ -815,7 +815,7 @@ def _render_results_content(scanned_count: int) -> None:
                 "RSI": "{:.1f}",
             }
         ),
-        use_container_width=True,
+        width="stretch",
         height=min(400, 40 + 35 * len(results)),
     )
 
@@ -888,7 +888,7 @@ def _render_results_content(scanned_count: int) -> None:
                     if breakdown_data:
                         st.dataframe(
                             breakdown_data,
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
 
@@ -914,7 +914,7 @@ def _render_results_content(scanned_count: int) -> None:
                         }
                     )
                 st.dataframe(
-                    comp_data, use_container_width=True, hide_index=True,
+                    comp_data, width="stretch", hide_index=True,
                 )
                 st.markdown("**Score Ranges:**")
                 for range_str, meaning in explanation.score_interpretation.items():

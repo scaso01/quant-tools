@@ -148,7 +148,7 @@ def render() -> None:
         preset_cols = st.columns(len(PRESETS))
         for col, (name, weights) in zip(preset_cols, PRESETS.items()):
             with col:
-                if st.button(name, key=f"preset_{name}", use_container_width=True):
+                if st.button(name, key=f"preset_{name}", width="stretch"):
                     st.session_state["portfolio_holdings_list"] = _with_ids(weights)
                     st.rerun()
 
@@ -211,7 +211,7 @@ def render() -> None:
             st.rerun()
 
         # Add holding button
-        if st.button("+ Add Holding", key="hold_add", use_container_width=True):
+        if st.button("+ Add Holding", key="hold_add", width="stretch"):
             _holdings_list.extend(_with_ids([("", 0.10)]))
             st.session_state["portfolio_holdings_list"] = _holdings_list
             st.rerun()
@@ -225,7 +225,7 @@ def render() -> None:
             unsafe_allow_html=True,
         )
         if abs(_weight_sum - 1.0) >= 0.01 and _weight_sum > 0:
-            if st.button("Normalize to 100%", key="hold_norm", use_container_width=True):
+            if st.button("Normalize to 100%", key="hold_norm", width="stretch"):
                 # New ids: every weight changes, so every row must remount.
                 _holdings_list = _with_ids(
                     [(sym, wt / _weight_sum) for _, sym, wt in _holdings_list]
@@ -357,7 +357,7 @@ def render() -> None:
         run_analysis = st.button(
             "Analyze Portfolio",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="portfolio_run",
         )
 
@@ -392,7 +392,7 @@ def render() -> None:
                 if st.button(
                     f"Load {name}",
                     key=f"empty_preset_{name}",
-                    use_container_width=True,
+                    width="stretch",
                     type="primary",
                 ):
                     # Set the list, not the JSON. The sidebar rebuilds
@@ -610,7 +610,7 @@ def render() -> None:
                 "Sharpe": format_number(h.sharpe),
             }
         )
-    st.dataframe(holdings_rows, use_container_width=True, hide_index=True)
+    st.dataframe(holdings_rows, width="stretch", hide_index=True)
 
     # ── Charts Row ────────────────────────────────────────────────────
     chart_left, chart_right = st.columns(2)
@@ -640,7 +640,7 @@ def render() -> None:
             )
             fig_sector.update_layout(**PLOTLY_LAYOUT)
             fig_sector.update_traces(textinfo="percent+label")
-            st.plotly_chart(fig_sector, use_container_width=True)
+            st.plotly_chart(fig_sector, width="stretch")
         else:
             st.info("No sector exposure data available.")
 
@@ -674,7 +674,7 @@ def render() -> None:
                 )
             )
             fig_corr.update_layout(**PLOTLY_LAYOUT)
-            st.plotly_chart(fig_corr, use_container_width=True)
+            st.plotly_chart(fig_corr, width="stretch")
         else:
             st.info("No correlation data available.")
 
@@ -772,7 +772,7 @@ def render() -> None:
                 xaxis_title="Trading Days",
                 yaxis_title="Portfolio Value ($)",
             )
-            st.plotly_chart(fig_mc, use_container_width=True)
+            st.plotly_chart(fig_mc, width="stretch")
 
             # ── MC Statistics Row ─────────────────────────────────────
             mc_cols = st.columns(4)
@@ -1017,7 +1017,7 @@ def render() -> None:
                         {"Symbol": sym, "Current": f"{holdings.get(sym, 0):.1%}", "Optimal": f"{w:.1%}"}
                         for sym, w in sorted(opt_result.weights.items(), key=lambda x: -x[1])
                     ]
-                    st.dataframe(weight_data, use_container_width=True, hide_index=True)
+                    st.dataframe(weight_data, width="stretch", hide_index=True)
 
                 except Exception as exc:
                     st.error(f"Optimization failed: {exc}")
@@ -1122,7 +1122,7 @@ def render() -> None:
                             xaxis_tickformat=".1%",
                             yaxis_tickformat=".1%",
                         )
-                        st.plotly_chart(fig_ef, use_container_width=True)
+                        st.plotly_chart(fig_ef, width="stretch")
                     else:
                         st.warning("Could not compute efficient frontier (no feasible points).")
                 except Exception as exc:
@@ -1172,7 +1172,7 @@ def render() -> None:
                                 )
                             )
                             fig_ca.update_layout(**PLOTLY_LAYOUT)
-                            st.plotly_chart(fig_ca, use_container_width=True)
+                            st.plotly_chart(fig_ca, width="stretch")
                         else:
                             st.info("Insufficient data for cross-asset correlation matrix.")
 
@@ -1212,7 +1212,7 @@ def render() -> None:
                                         yaxis_title="Correlation",
                                         yaxis_range=[-1, 1],
                                     )
-                                    st.plotly_chart(fig_roll, use_container_width=True)
+                                    st.plotly_chart(fig_roll, width="stretch")
                                 else:
                                     st.info(
                                         f"Not enough data for {ca_window}-day rolling correlation."

@@ -80,7 +80,7 @@ def render_date_presets(
             if st.button(
                 preset_name,
                 key=f"{key_prefix}_dp_{preset_name}",
-                use_container_width=True,
+                width="stretch",
                 type=btn_type,
             ):
                 st.session_state[state_key] = preset_name
