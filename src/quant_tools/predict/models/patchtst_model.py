@@ -110,7 +110,9 @@ class PatchTSTModel(PredictionModel):
             from neuralforecast.models import PatchTST
         except ImportError:
             self.state.is_trained = False
-            logger.warning("neuralforecast not installed")
+            logger.warning(
+                "neuralforecast not installed. pip install quant-tools[ml-neural]"
+            )
             return PredictionResult(
                 symbol=symbol,
                 asset_class=asset_class,

@@ -949,7 +949,7 @@ def _print_help() -> None:
     print("  ask              Natural language portfolio queries")
     print()
     print("Reporting & Execution:")
-    print("  tearsheet        Generate portfolio tearsheet (PDF)")
+    print("  tearsheet        Generate portfolio tearsheet (HTML)")
     print("  paper-trade      Paper trading (Alpaca / crypto sim)")
     print()
     print("Dashboard:")

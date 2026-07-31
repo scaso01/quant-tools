@@ -89,7 +89,7 @@ The AI Analysis page needs an OpenAI-compatible server on `http://localhost:8080
 
 ## CLI Reference
 
-All 28 commands, which is everything `quant-tools help` lists.
+All 27 commands, which is everything `quant-tools help` lists.
 
 ```bash
 # Scanner

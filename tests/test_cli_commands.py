@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import importlib
 import inspect
+import re
 from pathlib import Path
 
 import pytest
@@ -85,6 +86,36 @@ def test_every_advertised_command_has_a_handler(monkeypatch: pytest.MonkeyPatch)
     }
     unhandled = advertised - _dispatch_table()
     assert not unhandled, f"help lists commands with no handler: {sorted(unhandled)}"
+
+
+def test_readme_command_count_matches_the_dispatcher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The README states a command count, so it has to be the real one.
+
+    It said 28 while the dispatcher had 27. A number in a public README is a
+    claim someone can check in one command, and getting it wrong is the kind of
+    thing that makes a reader doubt the rest.
+    """
+    readme = CLI_SOURCE.parents[2] / "README.md"
+    match = re.search(r"All (\d+) commands", readme.read_text(encoding="utf-8"))
+    assert match, "README no longer states a command count in the expected form"
+
+    printed: list[str] = []
+    monkeypatch.setattr(
+        "builtins.print", lambda *a, **k: printed.append(" ".join(map(str, a)))
+    )
+    cli._print_help()
+    advertised = {
+        line.split()[0]
+        for line in printed
+        if line.startswith("  ") and line.split()
+        and not line.strip().startswith("quant-tools")
+    }
+    assert int(match.group(1)) == len(advertised), (
+        f"README claims {match.group(1)} commands, help lists {len(advertised)}: "
+        f"{sorted(advertised)}"
+    )
 
 
 @pytest.mark.parametrize("command", ["dashboard", "web"])

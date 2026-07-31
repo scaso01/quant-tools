@@ -42,8 +42,15 @@ class MoiraiModel(PredictionModel):
             self.state.is_trained = True
             self.state.last_trained = datetime.now()
         except ImportError:
+            # Deliberately not in any extra: uni2ts pins numpy~=1.26 and this
+            # project needs numpy>=2, so pip cannot satisfy both. Pointing at
+            # [foundation] here would send people to an install that never
+            # brings it in.
             logger.warning(
-                "uni2ts not installed. pip install quant-tools[foundation]"
+                "uni2ts not installed, so Moirai is unavailable. It pins "
+                "numpy 1.26 and cannot coexist with this project's numpy 2, "
+                "so it ships in no extra; install it in a separate environment "
+                "if you need it."
             )
         except Exception:
             logger.exception("Moirai module loading failed")
