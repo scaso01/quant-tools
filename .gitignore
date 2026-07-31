@@ -6,6 +6,11 @@ build/
 .eggs/
 *.egg
 .env
+# .env.example is tracked on purpose, so this stays narrow: it only catches
+# the copies made before editing keys, which hold real credentials and were
+# not covered by the .env line above.
+.env.bak*
+.env.*.bak
 quant_tools.log
 *.db
 *.sqlite
