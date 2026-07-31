@@ -8,14 +8,25 @@ from __future__ import annotations
 
 import re
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
 # ── Selector Constants ───────────────────────────────────────────────
 
 SIDEBAR = 'section[data-testid="stSidebar"]'
 MAIN = '[data-testid="stAppViewContainer"]'
-STATUS_WIDGET = '[data-testid="stStatusWidget"]'
 ALERT = '[data-testid="stAlert"]'
+
+# Whether a rerun is in flight is read off the app root, which Streamlit stamps
+# with data-test-script-state ("initial" / "running" / "notRunning"). The
+# stStatusWidget this used to watch is no longer rendered at all, so waiting for
+# it to appear and then vanish returned instantly every time. Long operations
+# then had their results asserted while the script was still running, which is
+# what made the scanner, factors, portfolio and live tests fail intermittently.
+SCRIPT_RUNNING = '[data-testid="stApp"][data-test-script-state="running"]'
+SCRIPT_IDLE = (
+    '[data-testid="stApp"][data-test-script-state="notRunning"], '
+    '[data-testid="stApp"][data-test-script-state="initial"]'
+)
 DATAFRAME = '[data-testid="stDataFrame"]'
 PLOTLY_CHART = ".stPlotlyChart, .js-plotly-plot"
 # st.metric elements (standard) + custom HTML metric cards
@@ -121,35 +132,27 @@ class StreamlitPage:
     # ── Wait Helpers ─────────────────────────────────────────────────
 
     def wait_for_rerun(self, timeout: int = RERUN_TIMEOUT) -> None:
-        """Wait for Streamlit's script rerun to complete.
+        """Block until Streamlit's script has finished running.
 
-        Streamlit shows a status widget while re-running. This waits
-        for it to appear (briefly) and then disappear.
+        A rerun that outlasts *timeout* raises rather than returning quietly.
+        Swallowing it is what produced the "neither results nor a user-facing
+        message appeared" failures: the wait gave up, the assertion sampled a
+        half-drawn page, and the report blamed the app instead of the clock.
         """
         try:
-            # Wait for the running indicator to appear (short timeout —
-            # fast reruns may never show it)
+            # A fast rerun can finish before this look, so not seeing "running"
+            # is fine. The wait below is the one that matters.
             self.page.wait_for_selector(
-                STATUS_WIDGET, state="visible", timeout=1_000
+                SCRIPT_RUNNING, state="attached", timeout=2_000
             )
-        except Exception:
-            pass  # May already be done
-
-        # Now wait for it to vanish
-        try:
-            self.page.wait_for_selector(
-                STATUS_WIDGET, state="hidden", timeout=timeout
-            )
-        except Exception:
-            pass  # May never have appeared
-
-        # Extra safety: wait for network idle. Best effort only, Streamlit holds
-        # a websocket open, so a busy app can simply never go idle. Letting this
-        # raise turned a settled page into a test failure.
-        try:
-            self.page.wait_for_load_state("networkidle", timeout=5_000)
         except Exception:
             pass
+
+        self.page.wait_for_selector(SCRIPT_IDLE, state="attached", timeout=timeout)
+        # React paints the new elements a frame after the state flips, and
+        # get_visible_text/get_metric_count read the DOM with no patience of
+        # their own.
+        self.page.wait_for_timeout(250)
 
     def wait_for_app_loaded(self) -> None:
         """Wait for the initial Streamlit app shell to render."""
@@ -638,7 +641,7 @@ class StreamlitPage:
         selectors = [
             f'[data-testid="stAlert"] [data-testid="stAlertContent{alert_kind.capitalize()}"]',
             f'[data-testid="stAlert{alert_kind.capitalize()}"]',
-            f'div[role="alert"]',
+            'div[role="alert"]',
         ]
         for sel in selectors:
             elements = self.page.locator(sel)
