@@ -15,6 +15,7 @@ from quant_tools.data.futures import (
     _business_days_before,
     _contract_months_for_year,
     _expiry_proxy,
+    _stitch_contracts,
     build_continuous_series,
     calendar_roll_dates,
     volume_roll_dates,
@@ -269,6 +270,124 @@ class TestBuildContinuousSeries:
         mock_dl.return_value = pd.DataFrame()
         with pytest.raises(ValueError):
             build_continuous_series("GC", date(2025, 1, 1), date(2025, 3, 31))
+
+
+# ── Back-Adjustment Tests ─────────────────────────────────────────────
+
+
+def _flat_contract(start: str, periods: int, price: float) -> pd.DataFrame:
+    """A contract quoted at one price for its whole life.
+
+    Flat prices are the point. Back-adjustment is arithmetic on the gaps
+    between contracts, and a random walk hides an arithmetic error inside its
+    own noise, which is how the per-roll bug survived tests that only checked
+    the result was non-empty.
+    """
+    dates = pd.date_range(start, periods=periods, freq="B")
+    return pd.DataFrame(
+        {
+            "Open": price, "High": price, "Low": price,
+            "Close": price, "Volume": 1000,
+        },
+        index=dates,
+    )
+
+
+class TestBackAdjustmentAccumulates:
+    """Adjustment has to carry across every later roll, not just the nearest.
+
+    Three contracts, two rolls, each quoted flat: A at 100, B at 110, C at 125.
+    The gaps are +10 at the first roll and +15 at the second. Back-adjusting
+    correctly lifts A by both (100 + 25) and B by the later one only
+    (110 + 15), so all three segments land on 125 and the series is flat.
+
+    Adjusting each segment by its own roll only would leave A at 110, a 15
+    point step in a series that should have none.
+    """
+
+    ROOT = "GC"
+
+    def _fixture(self) -> tuple[list, dict]:
+        a = FuturesContract(root=self.ROOT, month_code="G", year=2025)
+        b = FuturesContract(root=self.ROOT, month_code="J", year=2025)
+        c = FuturesContract(root=self.ROOT, month_code="M", year=2025)
+
+        contract_data = {
+            a.ticker: _flat_contract("2025-01-01", 90, 100.0),
+            b.ticker: _flat_contract("2025-01-01", 90, 110.0),
+            c.ticker: _flat_contract("2025-01-01", 90, 125.0),
+        }
+        rolls = [
+            (date(2025, 2, 3), a, b),
+            (date(2025, 3, 3), b, c),
+        ]
+        return rolls, contract_data
+
+    def test_panama_leaves_no_step_at_any_roll(self) -> None:
+        rolls, contract_data = self._fixture()
+        result = _stitch_contracts(
+            rolls, contract_data, date(2025, 1, 1), date(2025, 4, 30),
+            RollAdjustment.PANAMA,
+        )
+        assert not result.empty
+        assert result["Close"].nunique() == 1, (
+            f"expected one price across all segments, got "
+            f"{sorted(result['Close'].unique())}"
+        )
+        assert result["Close"].iloc[0] == pytest.approx(125.0)
+
+    def test_panama_lifts_the_oldest_segment_by_both_gaps(self) -> None:
+        """The oldest segment is the one a per-roll adjustment gets wrong."""
+        rolls, contract_data = self._fixture()
+        result = _stitch_contracts(
+            rolls, contract_data, date(2025, 1, 1), date(2025, 4, 30),
+            RollAdjustment.PANAMA,
+        )
+        oldest = result[result.index < pd.Timestamp("2025-02-03")]
+        assert not oldest.empty
+        # 100 + 15 + 10, not 100 + 10.
+        assert oldest["Close"].iloc[0] == pytest.approx(125.0)
+
+    def test_ratio_leaves_no_step_at_any_roll(self) -> None:
+        rolls, contract_data = self._fixture()
+        result = _stitch_contracts(
+            rolls, contract_data, date(2025, 1, 1), date(2025, 4, 30),
+            RollAdjustment.RATIO,
+        )
+        assert not result.empty
+        assert result["Close"].round(6).nunique() == 1, (
+            f"expected one price across all segments, got "
+            f"{sorted(result['Close'].unique())}"
+        )
+        assert result["Close"].iloc[0] == pytest.approx(125.0)
+
+    def test_none_leaves_the_raw_steps_in_place(self) -> None:
+        """The control. Without adjustment the steps must still be there."""
+        rolls, contract_data = self._fixture()
+        result = _stitch_contracts(
+            rolls, contract_data, date(2025, 1, 1), date(2025, 4, 30),
+            RollAdjustment.NONE,
+        )
+        assert sorted(result["Close"].unique()) == [100.0, 110.0, 125.0]
+
+    def test_all_price_columns_move_together(self) -> None:
+        """OHLC must stay consistent, not just Close."""
+        rolls, contract_data = self._fixture()
+        result = _stitch_contracts(
+            rolls, contract_data, date(2025, 1, 1), date(2025, 4, 30),
+            RollAdjustment.PANAMA,
+        )
+        for col in ("Open", "High", "Low"):
+            assert result[col].iloc[0] == pytest.approx(result["Close"].iloc[0])
+
+    def test_volume_is_not_adjusted(self) -> None:
+        """Only prices shift. Volume is a count, not a quote."""
+        rolls, contract_data = self._fixture()
+        result = _stitch_contracts(
+            rolls, contract_data, date(2025, 1, 1), date(2025, 4, 30),
+            RollAdjustment.PANAMA,
+        )
+        assert (result["Volume"] == 1000).all()
 
 
 # ── Universe Tests ────────────────────────────────────────────────────

@@ -408,11 +408,18 @@ def _stitch_contracts(
 
     # Build segments from newest to oldest (back-adjustment goes backward)
     segments: list[pd.DataFrame] = []
-    # TODO: back-adjustment here is per-roll, not cumulative. Each segment is
-    # shifted by the gap at its own roll only, so a series with several rolls
-    # still steps at every roll but the most recent. A running total carried
-    # backward through the loop is the fix. Left as-is for now because it
-    # changes published price history, which deserves its own change.
+
+    # Back-adjustment accumulates. Walking from the newest contract backwards,
+    # every segment carries the gaps from all the rolls that happened after it,
+    # not just the one at its own right-hand edge. Applying a single roll's gap
+    # per segment leaves the series stepping at every roll but the most recent,
+    # which is the discontinuity the adjustment exists to remove.
+    #
+    # PANAMA sums the differences, RATIO multiplies the ratios. Both start
+    # neutral, so the most recent contract is never adjusted, which is what
+    # makes the far right of the series equal real quoted prices.
+    cum_diff = 0.0
+    cum_ratio = 1.0
 
     # Start with the final (most recent) contract
     if rolls:
@@ -444,7 +451,9 @@ def _stitch_contracts(
         if old_df.empty:
             continue
 
-        # Compute adjustment at the roll point
+        # Fold this roll's gap into the running total, then apply the total.
+        # The gap itself is measured on raw quotes from both contracts, so it
+        # is read before any adjustment touches this segment.
         if adjustment != RollAdjustment.NONE and new_c.ticker in contract_data:
             new_df = contract_data[new_c.ticker]
             # Find closest price to roll date in both series
@@ -456,16 +465,18 @@ def _stitch_contracts(
                 new_close = float(new_at_roll["Close"].iloc[-1])
 
                 if adjustment == RollAdjustment.PANAMA:
-                    diff = new_close - old_close
-                    for col in price_cols:
-                        if col in old_df.columns:
-                            old_df[col] = old_df[col] + diff
-                elif adjustment == RollAdjustment.RATIO:
-                    if old_close != 0:
-                        ratio = new_close / old_close
-                        for col in price_cols:
-                            if col in old_df.columns:
-                                old_df[col] = old_df[col] * ratio
+                    cum_diff += new_close - old_close
+                elif adjustment == RollAdjustment.RATIO and old_close != 0:
+                    cum_ratio *= new_close / old_close
+
+        if adjustment == RollAdjustment.PANAMA and cum_diff != 0.0:
+            for col in price_cols:
+                if col in old_df.columns:
+                    old_df[col] = old_df[col] + cum_diff
+        elif adjustment == RollAdjustment.RATIO and cum_ratio != 1.0:
+            for col in price_cols:
+                if col in old_df.columns:
+                    old_df[col] = old_df[col] * cum_ratio
 
         segments.append(old_df)
 
