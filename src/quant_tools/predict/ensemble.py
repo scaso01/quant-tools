@@ -225,7 +225,7 @@ class PredictionEnsemble:
             raise PredictionError(
                 f"No trained models for {symbol}: every model returned an untrained "
                 "fallback (are the ML packages installed?). "
-                "Install them with: pip install 'quant-tools[ml]' (requires Python <= 3.13)."
+                "Install them with: pip install 'quant-tools[ml]'."
             )
 
         result = self._combine(

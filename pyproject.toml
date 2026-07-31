@@ -42,13 +42,21 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
-    # Classical and gradient-boosted forecasters. Capped at Python 3.13:
-    # pandas-ta pulls in numba, which has no 3.14 wheel and fails to build.
-    "pandas-ta>=0.3.14b",
+    # Classical and gradient-boosted forecasters. Installs on every Python this
+    # project supports, 3.11 through 3.14.
     "lightgbm>=4.0.0",
     "statsforecast>=1.7.0",
     "prophet>=1.1.5",
     "arch>=7.0.0",
+]
+ml-indicators = [
+    # The richer technical indicator set. Split out of [ml] because pandas-ta
+    # pulls in numba, which has no Python 3.14 wheel and fails to build from
+    # source, so bundling it here capped the whole extra, and therefore the
+    # `predict` command, at 3.13. Its only consumer is
+    # data/indicators_enhanced.py, which logs a warning and hands back the
+    # unenriched frame when the import fails.
+    "pandas-ta>=0.3.14b",
 ]
 ml-neural = [
     # TFT, PatchTST, N-HiTS and LSTM. Split out of [ml] because neuralforecast

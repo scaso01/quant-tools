@@ -17,8 +17,7 @@ git clone https://github.com/scaso01/quant-tools.git
 cd quant-tools
 pip install -e ".[dev]"
 
-# Optional: the ML prediction engine (Python 3.11 to 3.13, the torch-based
-# dependencies do not support 3.14 yet). Everything else works without it.
+# Optional: the ML prediction engine. Everything else works without it.
 pip install -e ".[ml]"
 
 # Optional: API keys, all free, and only for the features that need them.
@@ -174,8 +173,9 @@ data for rather than retrying it.
 
 | Extra | Install | Unlocks |
 |-------|---------|---------|
-| `ml` | `pip install -e ".[ml]"` | The prediction ensemble. Python 3.11 to 3.13 |
+| `ml` | `pip install -e ".[ml]"` | The prediction ensemble |
 | `ml-neural` | `pip install -e ".[ml-neural]"` | TFT, PatchTST, N-HiTS, LSTM. See the note below |
+| `ml-indicators` | `pip install -e ".[ml-indicators]"` | The wider pandas-ta indicator set. See the note below |
 | `alt-data` | `pip install -e ".[alt-data]"` | `news`, `trends`, `fear-greed --market equity` |
 | `foundation` | `pip install -e ".[foundation]"` | Chronos and TimesFM forecasters |
 | `realtime` | `pip install -e ".[realtime]"` | Alpaca paper trading |
@@ -190,6 +190,11 @@ data for rather than retrying it.
 On Linux and macOS it goes to 3.14. Installed or not, the models report
 themselves unavailable rather than failing the run.
 
+`ml-indicators` is separate for the same reason: `pandas-ta` pulls in `numba`,
+which has no Python 3.14 wheel and will not build from source. Keeping it inside
+`ml` capped the entire prediction engine at 3.13. Without it the indicator
+builder logs a warning and returns prices without the extra columns.
+
 Moirai is not in `foundation`: its `uni2ts` package pins numpy 1.26 while this
 project needs numpy 2. The model stays in the tree and reports itself
 unavailable, so nothing breaks, but there is no supported way to install it
@@ -197,7 +202,7 @@ alongside the rest.
 
 ## Prediction Engine
 
-Needs the `[ml]` extra (`pip install -e ".[ml]"`, Python 3.11 to 3.13). With no ML packages installed, `quant-tools predict` raises a clear error rather than handing back a fake neutral forecast.
+Needs the `[ml]` extra (`pip install -e ".[ml]"`). With no ML packages installed, `quant-tools predict` raises a clear error rather than handing back a fake neutral forecast.
 
 Twelve models feed a weighted ensemble vote. The core seven:
 
