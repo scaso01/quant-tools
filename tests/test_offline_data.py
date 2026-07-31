@@ -6,6 +6,9 @@ they do not fight the session-scoped yfinance guard in ``conftest.py``.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import pandas as pd
 import pytest
 
@@ -146,3 +149,56 @@ class TestOfflineTicker:
 
     def test_history_returns_prices(self) -> None:
         assert not offline._OfflineTicker("AAPL").history(period="1mo").empty
+
+
+class TestOfflineCrypto:
+    """Crypto has to be covered too, not just yfinance.
+
+    Called directly rather than through ``activate()``, which patches the
+    provider class globally and would leak into other tests.
+    """
+
+    def test_columns_match_the_ccxt_provider(self) -> None:
+        df = offline._offline_crypto_ohlcv(None, "BTC/USD", period="1mo")
+        assert list(df.columns) == ["Open", "High", "Low", "Close", "Volume"]
+
+    def test_index_is_dated(self) -> None:
+        df = offline._offline_crypto_ohlcv(None, "ETH/USD", period="1mo")
+        assert isinstance(df.index, pd.DatetimeIndex)
+
+    def test_same_pair_gives_the_same_series(self) -> None:
+        """Assertions on rendered prices need the generator to be stable."""
+        first = offline._offline_crypto_ohlcv(None, "SOL/USD", period="1mo")
+        second = offline._offline_crypto_ohlcv(None, "SOL/USD", period="1mo")
+        pd.testing.assert_frame_equal(first, second)
+
+    def test_different_pairs_differ(self) -> None:
+        btc = offline._offline_crypto_ohlcv(None, "BTC/USD", period="1mo")
+        eth = offline._offline_crypto_ohlcv(None, "ETH/USD", period="1mo")
+        assert not btc["Close"].equals(eth["Close"])
+
+    def test_activate_patches_the_crypto_provider(self) -> None:
+        """Without this the dashboard's crypto scans still call a live exchange.
+
+        activate() only replaced yfinance, so QUANT_TOOLS_OFFLINE left ccxt
+        talking to Kraken, which is the situation the module exists to avoid.
+
+        Run in a subprocess because activate() patches yfinance, the provider
+        class and the price cache all at module scope. Restoring them by hand
+        is the sort of thing that works until it silently does not, and a
+        half-restored patch leaks into whatever test runs next.
+        """
+        code = (
+            "from quant_tools.testing import offline;"
+            "from quant_tools.data.providers.crypto import CryptoProvider;"
+            "assert offline.activate(force=True) is True;"
+            "assert CryptoProvider.fetch_ohlcv is offline._offline_crypto_ohlcv;"
+            "df = CryptoProvider().fetch_ohlcv('BTC/USD', period='1mo');"
+            "assert not df.empty;"
+            "print('PATCHED')"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True, timeout=120
+        )
+        assert result.returncode == 0, result.stderr
+        assert "PATCHED" in result.stdout

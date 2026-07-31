@@ -245,8 +245,22 @@ class _NullCache:
         return None
 
 
+def _offline_crypto_ohlcv(
+    self: Any, symbol: str, period: str = "1y", interval: str = "1d"
+) -> pd.DataFrame:
+    """Stand in for the ccxt round trip, with the same generated bars.
+
+    Crypto does not go through yfinance, so patching that alone left the
+    exchange call live: the dashboard's crypto scans were reaching Kraken from
+    CI, which is exactly what this module exists to prevent. Columns match what
+    :class:`~quant_tools.data.providers.crypto.CryptoProvider` returns.
+    """
+    frame = generate_prices(symbol, period=period)
+    return frame[["Open", "High", "Low", "Close", "Volume"]]
+
+
 def activate(force: bool = False) -> bool:
-    """Patch yfinance and the price cache with the offline generator.
+    """Patch yfinance, ccxt and the price cache with the offline generator.
 
     Returns True if the patch was applied. Without *force* this is a no-op
     unless :func:`is_active` says the environment asked for it, so importing the
@@ -258,9 +272,11 @@ def activate(force: bool = False) -> bool:
     import yfinance as yf
 
     from quant_tools.data import market_data
+    from quant_tools.data.providers import crypto as crypto_provider
 
     yf.download = _download  # type: ignore[assignment]
     yf.Ticker = _OfflineTicker  # type: ignore[assignment]
+    crypto_provider.CryptoProvider.fetch_ohlcv = _offline_crypto_ohlcv  # type: ignore[assignment]
     market_data._cache = _NullCache()  # type: ignore[assignment]
     log.warning(
         "%s is set: market data is SYNTHETIC. Prices, fundamentals and news "
