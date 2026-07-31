@@ -15,7 +15,10 @@ COPY src/ src/
 
 # Install torch CPU-only first (smaller wheel, avoids 530MB CUDA download)
 RUN pip install --no-cache-dir --timeout=300 --retries 5 torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir --timeout=600 --retries 10 ".[ml]"
+# Both ML extras, not just [ml]. neuralforecast lives in [ml-neural] because
+# its ray dependency has no Windows wheel past Python 3.12, but this image is
+# Linux on 3.12, where ray is fine, so the image keeps TFT, PatchTST and N-HiTS.
+RUN pip install --no-cache-dir --timeout=600 --retries 10 ".[ml,ml-neural]"
 
 # Stage 2: Runtime (no build-essential)
 FROM python:3.12-slim
