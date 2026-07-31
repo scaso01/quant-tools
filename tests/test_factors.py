@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -320,3 +320,36 @@ class TestCalculateFactorScores:
 
         assert len(results) == 1
         assert results[0].symbol == "GOOD"
+
+
+class TestResolveUniverse:
+    """`factors --universe` accepts a universe name, not only tickers."""
+
+    def test_universe_name_expands(self):
+        """The documented `factors --universe sp100` must score 100 stocks.
+
+        It used to pass "sp100" straight through as a ticker, so the command
+        asked Yahoo for a stock by that name, retried the 404 three times, and
+        printed one row of zeroes.
+        """
+        from quant_tools.factors.cli import _resolve_universe
+
+        result = _resolve_universe(["sp100"])
+        assert len(result) == 100
+        assert "AAPL" in result
+
+    def test_sp500_name_expands_to_the_full_index(self):
+        from quant_tools.factors.cli import _resolve_universe
+
+        assert len(_resolve_universe(["sp500"])) > 500
+
+    def test_explicit_tickers_pass_through(self):
+        """The original list form has to keep working."""
+        from quant_tools.factors.cli import _resolve_universe
+
+        assert _resolve_universe(["AAPL", "MSFT", "NVDA"]) == ["AAPL", "MSFT", "NVDA"]
+
+    def test_single_ticker_is_not_mistaken_for_a_universe(self):
+        from quant_tools.factors.cli import _resolve_universe
+
+        assert _resolve_universe(["AAPL"]) == ["AAPL"]

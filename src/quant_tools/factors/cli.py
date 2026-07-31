@@ -32,7 +32,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--universe",
         nargs="+",
         default=DEFAULT_UNIVERSE,
-        help="Space-separated list of ticker symbols (default: top 20 S&P 500).",
+        help=(
+            "A universe name (sp500, sp100, russell1000, international, "
+            "emerging, global) or a space-separated list of tickers "
+            "(default: top 20 S&P 500)."
+        ),
     )
     parser.add_argument(
         "--regime",
@@ -46,6 +50,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of top picks to display (default: 10).",
     )
     return parser
+
+
+def _resolve_universe(values: list[str]) -> list[str]:
+    """Turn --universe into a ticker list.
+
+    ``scan`` takes a universe name here and the README documents the same shape
+    for ``factors``, but this only ever accepted tickers. So the documented
+    ``factors --universe sp100`` asked Yahoo for a stock called SP100, retried
+    the 404 three times, and printed a single row of zeroes for it.
+
+    A lone argument is tried as a universe name first and falls back to being a
+    ticker, so ``--universe AAPL MSFT`` keeps working unchanged.
+    """
+    from quant_tools.data.universe import get_universe
+
+    if len(values) == 1:
+        try:
+            return get_universe(values[0])
+        except ValueError:
+            pass  # Not a universe name, so treat it as a single ticker.
+    return values
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,8 +100,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {key}: {val}")
             print()
 
-        print(f"Computing factor scores for {len(args.universe)} symbols...")
-        scores = calculate_factor_scores(args.universe)
+        symbols = _resolve_universe(args.universe)
+        print(f"Computing factor scores for {len(symbols)} symbols...")
+        scores = calculate_factor_scores(symbols)
 
         print(f"\n{'Rank':<6}{'Symbol':<8}{'Name':<25}{'Value':<9}{'Mom':<9}{'Qual':<9}{'Composite':<10}")
         print("-" * 76)
