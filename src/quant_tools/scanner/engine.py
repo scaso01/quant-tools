@@ -69,8 +69,10 @@ def _prefetch_prices(
     # failure costs one chunk rather than everything.
     chunk_size = 100
     requests = 0
-    for i in range(0, len(symbols), chunk_size):
-        chunk = symbols[i:i + chunk_size]
+
+    def fetch_chunk(chunk: list[str]) -> None:
+        """Download one chunk and merge whatever came back into ``out``."""
+        nonlocal requests
         requests += 1
         try:
             with _download_lock:
@@ -80,10 +82,10 @@ def _prefetch_prices(
                 )
         except Exception:
             log.warning("Batch price prefetch failed for %d symbols", len(chunk), exc_info=True)
-            continue
+            return
 
         if raw is None or raw.empty:
-            continue
+            return
 
         covered.update(chunk)
         for symbol in chunk:
@@ -100,6 +102,23 @@ def _prefetch_prices(
                     out[symbol] = df
             except Exception:
                 log.debug("Could not split prefetched frame for %s", symbol, exc_info=True)
+
+    for i in range(0, len(symbols), chunk_size):
+        fetch_chunk(symbols[i:i + chunk_size])
+
+    # Under load Yahoo drops symbols from a bulk response that are perfectly
+    # tradeable: one run lost JPM, V and GE, and the next run had them back.
+    # Those are indistinguishable from delisted tickers in a single response,
+    # and the caller skips anything missing rather than retrying it, so a
+    # throttled request quietly shrank the scan. A hundred-symbol universe
+    # announced a hundred and ranked ninety-two. One more batched pass
+    # separates a busy server from a dead ticker without going back to the
+    # per-symbol retries this function exists to avoid.
+    missed = sorted(covered - out.keys())
+    if missed:
+        log.info("Re-requesting %d symbols the bulk response left out", len(missed))
+        for i in range(0, len(missed), chunk_size):
+            fetch_chunk(missed[i:i + chunk_size])
 
     dead = len(covered) - len(out)
     log.info(

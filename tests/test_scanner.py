@@ -774,3 +774,75 @@ class TestMultiAssetScan:
         for st in SignalType:
             assert st.value in details
         assert "breakdown" in details
+
+
+class TestPrefetchRetry:
+    """A bulk response that omits a symbol is not proof the symbol is dead."""
+
+    @staticmethod
+    def _frame(symbols: list[str]) -> pd.DataFrame:
+        """Build a yfinance-shaped MultiIndex frame for *symbols*."""
+        idx = pd.date_range("2024-01-01", periods=30, freq="B")
+        cols = pd.MultiIndex.from_product(
+            [symbols, ["Open", "High", "Low", "Close", "Volume"]]
+        )
+        data = np.tile(np.arange(1.0, 31.0)[:, None], (1, len(cols)))
+        return pd.DataFrame(data, index=idx, columns=cols)
+
+    def test_symbols_missing_from_the_first_response_are_re_requested(self):
+        """Yahoo drops tradeable symbols under load; one retry gets them back.
+
+        Without this the caller treats anything absent from the bulk response
+        as delisted and skips it, so a throttled request silently shrinks the
+        scan: a hundred-symbol universe announced a hundred and ranked
+        ninety-two.
+        """
+        from quant_tools.scanner.engine import _prefetch_prices
+
+        wanted = ["AAA", "BBB", "CCC"]
+        calls: list[list[str]] = []
+
+        def fake_download(tickers, **kwargs):
+            chunk = list(tickers)
+            calls.append(chunk)
+            # First response omits CCC, as a throttled Yahoo would.
+            present = [t for t in chunk if t != "CCC"] if len(calls) == 1 else chunk
+            return self._frame(present)
+
+        with patch("yfinance.download", side_effect=fake_download):
+            frames, covered = _prefetch_prices(wanted, "1y")
+
+        assert calls[1] == ["CCC"], f"expected a retry for CCC, got {calls[1:]}"
+        assert set(frames) == {"AAA", "BBB", "CCC"}
+        assert covered == {"AAA", "BBB", "CCC"}
+
+    def test_a_genuinely_dead_symbol_is_retried_once_then_dropped(self):
+        """A delisted ticker must not send the scan into a retry loop."""
+        from quant_tools.scanner.engine import _prefetch_prices
+
+        calls: list[list[str]] = []
+
+        def fake_download(tickers, **kwargs):
+            calls.append(list(tickers))
+            return self._frame(["AAA", "BBB"])
+
+        with patch("yfinance.download", side_effect=fake_download):
+            frames, _ = _prefetch_prices(["AAA", "BBB", "DEAD"], "1y")
+
+        assert len(calls) == 2, f"expected exactly one retry, made {len(calls)} requests"
+        assert "DEAD" not in frames
+
+    def test_no_retry_when_the_first_response_is_complete(self):
+        from quant_tools.scanner.engine import _prefetch_prices
+
+        calls: list[list[str]] = []
+
+        def fake_download(tickers, **kwargs):
+            calls.append(list(tickers))
+            return self._frame(list(tickers))
+
+        with patch("yfinance.download", side_effect=fake_download):
+            frames, _ = _prefetch_prices(["AAA", "BBB"], "1y")
+
+        assert len(calls) == 1
+        assert set(frames) == {"AAA", "BBB"}
