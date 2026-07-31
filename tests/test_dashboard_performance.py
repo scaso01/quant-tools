@@ -1,7 +1,6 @@
 """Tests for the Performance Tracker dashboard view."""
 from __future__ import annotations
 
-import pytest
 import plotly.graph_objects as go
 
 from quant_tools.models import AssetClass, ModelPerformance

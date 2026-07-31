@@ -224,7 +224,6 @@ class TestBuildIndicatorSet:
 
     def test_missing_pandas_ta_returns_unchanged(self):
         """When pandas_ta is not installed, return df without indicators."""
-        import importlib
         import sys
 
         # Temporarily remove pandas_ta from sys.modules

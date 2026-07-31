@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 
 def build_predict_parser() -> argparse.ArgumentParser:

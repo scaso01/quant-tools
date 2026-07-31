@@ -157,7 +157,7 @@ class TestChronosPrediction:
         mock_torch.tensor.return_value = MagicMock()
 
         with patch.dict("sys.modules", {"torch": mock_torch}):
-            result = model.predict(prices_df)
+            model.predict(prices_df)  # asserted on via state.metadata below
 
         assert "q10" in model.state.metadata
         assert "q25" in model.state.metadata

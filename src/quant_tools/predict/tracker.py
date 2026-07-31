@@ -9,8 +9,6 @@ from quant_tools.models import (
     AssetClass,
     EnsemblePrediction,
     ModelPerformance,
-    PredictionDirection,
-    PredictionOutcome,
 )
 
 log = logging.getLogger("quant_tools")

@@ -19,7 +19,6 @@ from quant_tools.data.universe import (
     UNIVERSE_PRESETS,
     _EXTENDED_PRESET_BUILDERS,
     _extended_cache,
-    _get_extended_preset,
     get_universe,
 )
 from quant_tools.models import TickerMeta

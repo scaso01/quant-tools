@@ -7,7 +7,6 @@ are not available.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -118,7 +117,6 @@ def render() -> None:
     from quant_tools.backtest.metrics import calculate_max_drawdown
     from quant_tools.dashboard.core.colors import (
         ACCENT_AMBER,
-        ACCENT_BLUE,
         ACCENT_RED,
     )
     from quant_tools.dashboard.core.date_presets import render_date_presets

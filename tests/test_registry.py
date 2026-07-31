@@ -4,11 +4,10 @@ All external APIs are mocked. No real network calls.
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from quant_tools.data.providers.registry import ProviderRegistry
 from quant_tools.models import AssetClass

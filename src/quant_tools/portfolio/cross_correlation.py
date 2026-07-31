@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date
 
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from quant_tools.models import AssetClass, CrossAssetCorrelation, RollingCorrelation
+from quant_tools.models import AssetClass, CrossAssetCorrelation
 
 
 def calculate_cross_asset_correlations(

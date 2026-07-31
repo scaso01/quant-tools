@@ -5,7 +5,6 @@ All external APIs are mocked. No real network calls.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx

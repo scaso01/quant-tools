@@ -5,7 +5,7 @@ All external APIs are mocked. No real network calls.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -161,8 +161,6 @@ class TestFetchExpirations:
 
         with patch.dict("sys.modules", {"yfinance": None}):
             # Force reimport to trigger ImportError
-            import importlib
-            import quant_tools.data.providers.options as opts_mod
             # Manually simulate what happens in fetch_expirations
             provider = OptionsProvider()
             # Patch the import inside the method

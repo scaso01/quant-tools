@@ -19,7 +19,6 @@ from quant_tools.dashboard.core.colors import (
 )
 from quant_tools.dashboard.core.helpers import (
     PLOTLY_LAYOUT,
-    directional_color,
     format_number,
     render_metric_card,
     render_news_section,
@@ -29,8 +28,6 @@ from quant_tools.data.universe import (
     UNIVERSE_PRESETS,
     UniversePreset,
     COMMODITY_PRESETS,
-    COMMODITY_UNIVERSE,
-    list_all_presets,
     _get_extended_preset,
 )
 from quant_tools.dashboard.core.page_help import render_page_help
@@ -39,8 +36,6 @@ from quant_tools.models import AssetClass, ScanResult, SignalType
 from quant_tools.scanner.engine import scan_universe
 from quant_tools.scanner.signal_explanations import (
     SIGNAL_EXPLANATIONS,
-    SignalExplanation,
-    SignalComponent,
 )
 
 

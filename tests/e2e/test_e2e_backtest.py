@@ -10,12 +10,6 @@ import pytest
 
 from .streamlit_helpers import (
     SEL_BUTTON,
-    SEL_DATE_INPUT,
-    SEL_EXPANDER,
-    SEL_NUMBER_INPUT,
-    SEL_SELECTBOX,
-    SEL_SLIDER,
-    SEL_TEXT_INPUT,
     StreamlitPage,
 )
 

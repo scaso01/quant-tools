@@ -5,7 +5,6 @@ import logging
 import warnings
 from datetime import date, timedelta
 
-import numpy as np
 import pandas as pd
 
 from quant_tools.models import CommoditySpec, FuturesContract, RollAdjustment, RollMethod
@@ -409,7 +408,11 @@ def _stitch_contracts(
 
     # Build segments from newest to oldest (back-adjustment goes backward)
     segments: list[pd.DataFrame] = []
-    adjustments: list[tuple[int, float]] = []  # (segment_idx, adjustment_value)
+    # TODO: back-adjustment here is per-roll, not cumulative. Each segment is
+    # shifted by the gap at its own roll only, so a series with several rolls
+    # still steps at every roll but the most recent. A running total carried
+    # backward through the loop is the fix. Left as-is for now because it
+    # changes published price history, which deserves its own change.
 
     # Start with the final (most recent) contract
     if rolls:

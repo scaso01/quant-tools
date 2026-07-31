@@ -5,11 +5,10 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from quant_tools.errors import DataError
-from quant_tools.models import PortfolioAnalysis, PortfolioHolding
+from quant_tools.models import PortfolioAnalysis
 from quant_tools.portfolio.analyzer import (
     analyze_portfolio,
     calculate_correlation_matrix,

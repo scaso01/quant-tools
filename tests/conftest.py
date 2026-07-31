@@ -11,8 +11,7 @@ Provides:
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import pytest
-import numpy as np
 
 from quant_tools.errors import PredictionError
 from quant_tools.models import (
@@ -12,7 +11,7 @@ from quant_tools.models import (
     PredictionResult,
 )
 from quant_tools.predict.base import ModelState
-from quant_tools.predict.ensemble import MIN_WEIGHT, PredictionEnsemble
+from quant_tools.predict.ensemble import PredictionEnsemble
 
 
 # ── Mock Model ──────────────────────────────────────────────────────
@@ -271,7 +270,6 @@ class TestWeights:
             MockModel("b", PredictionDirection.DOWN),
         ]
         ens = _make_ensemble(models)
-        old_weights = ens.get_weights()
 
         ens.update_weights({"a": 0.9, "b": 0.1})
         new_weights = ens.get_weights()
@@ -396,26 +394,20 @@ class TestErrorHandling:
 
     def test_empty_predictions_raises(self) -> None:
         """If all models fail and produce no predictions, should raise."""
-        models = [
-            MockModel("fail1", PredictionDirection.UP, fail=True),
-            MockModel("fail2", PredictionDirection.UP, fail=True),
-        ]
-        ens = _make_ensemble(models)
-        # Simulate predict() flow: all models fail -> empty predictions list
+        # TODO: this raises the error itself rather than getting it out of the
+        # ensemble, so it passes no matter what predict() does. Making it real
+        # means feeding predict() a genuine OHLCV frame (it runs
+        # FeatureEngineer before it reaches the models) and widening
+        # MockModel.predict to take the interval keyword the ensemble passes.
         preds: list[PredictionResult] = []
-        # The predict() method raises PredictionError when no predictions
         with pytest.raises(PredictionError, match="All models failed"):
             if not preds:
                 raise PredictionError("All models failed for TEST")
 
     def test_all_models_fail_raises(self) -> None:
         """If all model predictions are empty, _combine caller should raise."""
-        # This tests the predict() path where all models fail
-        # We test the condition directly
+        # TODO: same as above. Self-raised, so it does not exercise predict().
         with pytest.raises(PredictionError, match="All models failed"):
-            models = [MockModel("fail1", PredictionDirection.UP, fail=True)]
-            ens = _make_ensemble(models)
-            # Manually simulate predict() flow where all models fail
             raise PredictionError("All models failed for TEST")
 
     def test_unsupported_asset_class_skipped(self) -> None:

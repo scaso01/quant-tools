@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
 
 from quant_tools.factors.macro import _classify_regime, detect_regime
 from quant_tools.models import MacroRegime, MacroSnapshot

@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
 
-from quant_tools.models import AssetClass, PredictionDirection, PredictionResult
+from quant_tools.models import PredictionDirection
 from quant_tools.predict.base import PredictionModel
 
 logger = logging.getLogger("quant_tools")

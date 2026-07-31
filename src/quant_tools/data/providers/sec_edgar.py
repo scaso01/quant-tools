@@ -356,11 +356,15 @@ class SecEdgarClient:
     def _has_edgartools() -> bool:
         """Check if edgartools library is available.
 
+        Actually importing it is the check. ``find_spec`` would call a
+        half-installed package available, and edgartools has enough transitive
+        dependencies for that to be a real outcome.
+
         Returns:
             True if edgartools is importable, False otherwise.
         """
         try:
-            import edgar  # noqa: F401
-            return True
+            import edgar
         except ImportError:
             return False
+        return edgar is not None

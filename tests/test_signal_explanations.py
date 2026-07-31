@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from quant_tools.models import SignalType
 from quant_tools.scanner.signal_explanations import (

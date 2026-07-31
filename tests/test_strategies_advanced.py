@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from quant_tools.backtest.strategies_advanced import (
     breakout,

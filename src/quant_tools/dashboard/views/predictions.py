@@ -19,7 +19,7 @@ from quant_tools.dashboard.core.helpers import (
 from quant_tools.dashboard.core.symbol_picker import render_symbol_picker
 from quant_tools.dashboard.core.symbol_state import get_active_symbol
 from quant_tools.predict.horizons import (
-    get_horizons, get_horizon_labels, horizon_display, parse_horizon_label,
+    get_horizon_labels, parse_horizon_label,
 )
 
 

@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 from quant_tools.reporting.tearsheet import (
-    TearsheetData,
     TearsheetGenerator,
     compute_metrics,
 )

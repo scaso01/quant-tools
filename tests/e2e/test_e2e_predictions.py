@@ -11,7 +11,6 @@ import pytest
 from .streamlit_helpers import (
     SEL_BUTTON,
     SEL_SELECTBOX,
-    SEL_TEXT_INPUT,
     StreamlitPage,
 )
 
@@ -110,7 +109,6 @@ class TestPredictionsNegative:
 
     def test_no_predictions_state(self, st_page: StreamlitPage) -> None:
         """When no predictions exist, an info message should be displayed."""
-        visible = st_page.get_visible_text()
         # Either predictions are shown (dataframe) or the info message appears
         has_data = st_page.has_dataframe()
         # Covers both empty states: "No predictions yet" before anything has been

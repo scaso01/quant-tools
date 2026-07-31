@@ -96,8 +96,9 @@ class TestApplyRegimeTilt:
 
     def test_original_zscores_preserved(self):
         """Individual factor z-scores should be preserved (only composite changes)."""
+        # _apply_regime_tilt builds a new list, so comparing against `scores`
+        # afterwards is a real check and needs no snapshot.
         scores = _make_factor_scores(3)
-        original_value_zs = [fs.value_z for fs in scores]
         tilts = REGIME_TILTS[MacroRegime.RECOVERY]
         adjusted = _apply_regime_tilt(scores, tilts)
 

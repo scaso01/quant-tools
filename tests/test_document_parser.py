@@ -5,7 +5,6 @@ All external APIs are mocked. No real file parsing.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

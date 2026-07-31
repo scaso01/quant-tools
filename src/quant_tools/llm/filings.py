@@ -105,7 +105,7 @@ class FilingAnalyzer:
                 f"Ticker: {ticker}, Filing type: {filing_type}\n\n"
                 f"=== OLDER FILING ===\n"
                 + "\n---\n".join(chunks_old[:3])
-                + f"\n\n=== NEWER FILING ===\n"
+                + "\n\n=== NEWER FILING ===\n"
                 + "\n---\n".join(chunks_new[:3])
             )
             return self._query_llm(system, user)

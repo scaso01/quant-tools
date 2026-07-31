@@ -21,7 +21,6 @@ from quant_tools.data.futures import (
 )
 from quant_tools.data.universe import COMMODITY_PRESETS, COMMODITY_UNIVERSE
 from quant_tools.models import (
-    CommoditySpec,
     FuturesContract,
     RollAdjustment,
     RollMethod,

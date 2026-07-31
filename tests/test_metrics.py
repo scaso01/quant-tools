@@ -137,9 +137,12 @@ class TestSortino:
         returns = np.random.normal(0.001, 0.01, 252)
         sharpe = calculate_sharpe(returns, risk_free_rate=0.0)
         sortino = calculate_sortino(returns, risk_free_rate=0.0)
-        # Sortino uses only downside deviation, so typically >= Sharpe
-        # This is not guaranteed for all samples, just a sanity check
-        assert sortino != 0.0
+        # Sortino divides by downside deviation only, so it should come out at
+        # or above Sharpe. That does not hold for every sample, but the seed is
+        # fixed, so this one is decided: 1.6833 against 1.5795. The test used to
+        # assert only that sortino was non-zero, which its name did not promise
+        # and which would have passed with the two measures the wrong way round.
+        assert sortino >= sharpe
 
 
 class TestMaxDrawdown:

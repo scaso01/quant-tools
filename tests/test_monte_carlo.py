@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -18,8 +17,9 @@ from quant_tools.portfolio.monte_carlo import (
 )
 
 try:
-    import arch  # noqa: F401
-    _HAS_ARCH = True
+    import arch
+
+    _HAS_ARCH = arch is not None
 except ImportError:
     _HAS_ARCH = False
 
@@ -98,7 +98,6 @@ class TestRunMonteCarlo:
     def test_large_n_simulations_mean_convergence(self):
         """With many simulations, mean final should converge near expected value."""
         mu = 0.0004
-        sigma = 0.01
         n_days = 252
         returns = np.full(252, mu)  # Use deterministic returns for known mu/sigma
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import numpy as np
 import pytest
 
 from quant_tools.realtime.analytics import (
@@ -12,7 +11,7 @@ from quant_tools.realtime.analytics import (
     AlertType,
     StreamingAnalytics,
 )
-from quant_tools.realtime.feed import FeedSource, TickEvent
+from quant_tools.realtime.feed import TickEvent
 
 
 # =============================================================================

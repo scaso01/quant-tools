@@ -76,10 +76,10 @@ class MoiraiModel(PredictionModel):
             )
 
         try:
-            import torch
+            # uni2ts imports torch at module scope, so this covers both.
             from uni2ts.model.moirai import MoiraiForecast
         except ImportError:
-            logger.warning("uni2ts or torch not installed")
+            logger.warning("uni2ts (and the torch it depends on) is not installed")
             return PredictionResult(
                 symbol=symbol,
                 asset_class=asset_class,
@@ -113,13 +113,17 @@ class MoiraiModel(PredictionModel):
                     interval=interval,
                 )
 
-            # Frequency mapping
-            freq_map = {"1d": "D", "1h": "h", "4h": "4h", "15m": "15min"}
-            freq = freq_map.get(interval, "D")
+            # Frequency mapping. Daily maps to business days, not calendar
+            # days, because that is the spacing the price feed actually has.
+            freq_map = {"1d": "B", "1h": "h", "4h": "4h", "15m": "15min"}
+            freq = freq_map.get(interval, "B")
 
-            # Build time series DataFrame
+            # Build time series DataFrame. The frequency is passed through
+            # rather than hardcoded: an intraday series used to be handed to
+            # the model stamped with business-day timestamps, which told it the
+            # bars were a day apart when they were fifteen minutes apart.
             n = len(prices)
-            ds = pd.date_range(end=pd.Timestamp.now().normalize(), periods=n, freq="B")
+            ds = pd.date_range(end=pd.Timestamp.now().normalize(), periods=n, freq=freq)
             ts_df = pd.DataFrame({"target": prices.astype(float)}, index=ds)
 
             # Create forecast pipeline

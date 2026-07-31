@@ -1,15 +1,13 @@
 """Tests for ModelBenchmark."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from quant_tools.models import AssetClass, PredictionDirection, PredictionResult
 from quant_tools.predict.base import PredictionModel
-from quant_tools.predict.benchmark import ModelBenchmark, _create_all_models
+from quant_tools.predict.benchmark import ModelBenchmark
 
 
 # ── Helpers ─────────────────────────────────────────────────────────

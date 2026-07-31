@@ -19,9 +19,7 @@ from __future__ import annotations
 import http.client
 import importlib
 import json
-import os
 import socket
-import sys
 from pathlib import Path
 
 import pytest
@@ -402,7 +400,6 @@ class TestDashboardConfig:
 
 import re
 from datetime import date, datetime, timedelta
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd

@@ -7,7 +7,6 @@ import pytest
 
 from quant_tools.reporting.factor_attribution import (
     AttributionResult,
-    FactorExposure,
     _ols_regression,
     capm_decompose,
     decompose,

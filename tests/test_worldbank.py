@@ -213,7 +213,8 @@ class TestWorldBankClient:
         mock_client_cls.return_value = mock_client
 
         client = WorldBankClient()
-        df = client.fetch_indicator("CN", "gdp_growth", date_range="2010:2012")
+        # The assertion is on the outgoing request, not the frame.
+        client.fetch_indicator("CN", "gdp_growth", date_range="2010:2012")
 
         call_args = mock_client.get.call_args
         assert call_args[1]["params"]["date"] == "2010:2012"
