@@ -109,24 +109,29 @@ def _parse_holdings(raw: str) -> dict[str, float]:
 
 
 def _portfolio_returns(holdings: dict[str, float], period: str = "1y"):
-    """Weighted daily return series for a set of holdings.
+    """Weighted daily return series for a set of holdings, indexed by date.
 
     The risk, stress-test and tearsheet commands all need this and all build it
     the same way the portfolio command does.
+
+    Two things depend on the dates being kept. The tearsheet builds its monthly
+    and yearly tables by resampling, so a positional index made both come out
+    empty and the report announced "No yearly returns available" over a full
+    year of data. Joining on dates also lines the holdings up by day rather
+    than by position, which starts to matter as soon as two of them have
+    different histories: truncating each to a common length silently paired
+    one symbol's Monday with another's Thursday.
     """
-    import numpy as np
+    import pandas as pd
 
     from quant_tools.data.market_data import fetch_prices
 
-    returns_arrays = []
-    for symbol in holdings:
-        df = fetch_prices(symbol, period=period)
-        close = df["Close"].values.astype(float)
-        returns_arrays.append(np.diff(close) / close[:-1])
-
-    min_len = min(len(r) for r in returns_arrays)
-    matrix = np.column_stack([r[:min_len] for r in returns_arrays])
-    return matrix @ np.array([holdings[s] for s in holdings])
+    closes = pd.DataFrame(
+        {symbol: fetch_prices(symbol, period=period)["Close"] for symbol in holdings}
+    ).dropna()
+    daily = closes.pct_change().dropna()
+    weights = pd.Series(holdings, dtype=float)
+    return daily.mul(weights[daily.columns], axis=1).sum(axis=1)
 
 
 # These four sub-CLIs already return 1 when they reject their input, but the
@@ -698,17 +703,18 @@ def _cmd_tearsheet(args: list[str]) -> None:
 
     holdings = _parse_holdings(parsed.holdings)
 
-    import pandas as pd
-
     from quant_tools.data.market_data import fetch_prices
     from quant_tools.reporting.tearsheet import TearsheetGenerator, compute_metrics
 
     # The generator renders HTML from a TearsheetData; it has no generate() and
     # produces no PDF, so the command now writes the HTML it really makes and
     # the default filename says so.
-    returns = pd.Series(_portfolio_returns(holdings, period=parsed.period))
+    returns = _portfolio_returns(holdings, period=parsed.period)
     benchmark_prices = fetch_prices(parsed.benchmark, period=parsed.period)
-    benchmark = benchmark_prices["Close"].pct_change().dropna().reset_index(drop=True)
+    # Kept on its dates so compute_metrics can align it against the portfolio
+    # by day. It used to be reset to a positional index, which quietly paired
+    # the two series by row number.
+    benchmark = benchmark_prices["Close"].pct_change().dropna()
 
     data = compute_metrics(returns, benchmark_returns=benchmark)
     html = TearsheetGenerator(title=f"Tearsheet: {', '.join(holdings)}").generate_html(data)
