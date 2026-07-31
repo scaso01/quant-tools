@@ -1,15 +1,20 @@
 # tests/test_dashboard.py
 """Dashboard regression tests for Quant-Tools Streamlit.
 
-These tests hit a LIVE Streamlit dashboard (http://localhost:8502).
-They verify health, page loading, page source definitions, data layer
-integrity, and error handling.
+Most of this file reads the dashboard sources off disk and needs no server:
+page definitions, view modules, the data layer and error handling.
+
+A handful of classes additionally hit a live Streamlit over HTTP. Those are
+opt-in via QUANT_TOOLS_DASHBOARD_URL and skip without it, because over HTTP a
+Streamlit page is a generic shell and they cannot tell which app answered. They
+verify a server is up, nothing more. The suite that actually exercises this
+dashboard is tests/e2e, which drives it in a browser.
 
 Run:
     python -m pytest tests/test_dashboard.py -v
+    QUANT_TOOLS_DASHBOARD_URL=http://localhost:8501 python -m pytest tests/test_dashboard.py -v
 
-All tests are marked @pytest.mark.dashboard and auto-skip when the
-Streamlit server is unreachable.
+All tests are marked @pytest.mark.dashboard.
 
 Uses http.client instead of requests/urllib to bypass the conftest.py
 session-scoped network guard that blocks requests/httpx/urllib.request.
@@ -19,22 +24,52 @@ from __future__ import annotations
 import http.client
 import importlib
 import json
+import os
 import socket
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
 # ── Configuration ────────────────────────────────────────────────────
+#
+# The server under test must be named explicitly, and there is deliberately no
+# default. This used to hardcode port 8502 and run whenever anything was
+# listening there, which on a machine running a second Streamlit app meant
+# these tests passed against that other app.
+#
+# That failure is silent and cannot be detected from inside the test. A
+# Streamlit page is an empty shell over HTTP, with the app rendered client side
+# over a websocket, so every check below sees exactly the same bytes no matter
+# which app is running. There is no marker to assert on: the served HTML,
+# the <title>, and /_stcore/host-config are byte for byte generic. Verified by
+# serving this dashboard and an unrelated one side by side and diffing them.
+#
+# So these checks can only ever say "a Streamlit server is answering". Opting
+# in is what keeps that from being read as "the quant-tools dashboard works".
+# For that, see tests/e2e, which drives the real app in a browser.
+#
+#     QUANT_TOOLS_DASHBOARD_URL=http://localhost:8501 pytest tests/test_dashboard.py
 
-STREAMLIT_HOST = "localhost"
-STREAMLIT_PORT = 8502
+_DASHBOARD_URL = os.environ.get("QUANT_TOOLS_DASHBOARD_URL", "").strip()
 TIMEOUT = 15  # seconds
+
+
+def _parse_target(url: str) -> tuple[str, int]:
+    """Split the opt-in URL into host and port, defaulting to Streamlit's."""
+    parsed = urlparse(url if "//" in url else f"http://{url}")
+    return parsed.hostname or "localhost", parsed.port or 8501
+
+
+STREAMLIT_HOST, STREAMLIT_PORT = _parse_target(_DASHBOARD_URL or "http://localhost:8501")
 
 
 # ── Reachability check ───────────────────────────────────────────────
 
 def _streamlit_reachable() -> bool:
-    """Return True if Streamlit port accepts TCP connections."""
+    """True when a server was named AND its port accepts connections."""
+    if not _DASHBOARD_URL:
+        return False
     try:
         with socket.create_connection((STREAMLIT_HOST, STREAMLIT_PORT), timeout=5):
             return True
@@ -42,7 +77,11 @@ def _streamlit_reachable() -> bool:
         return False
 
 
-_SKIP_REASON = f"Streamlit ({STREAMLIT_HOST}:{STREAMLIT_PORT}) unreachable"
+_SKIP_REASON = (
+    "set QUANT_TOOLS_DASHBOARD_URL to a running quant-tools dashboard to run these"
+    if not _DASHBOARD_URL
+    else f"Streamlit ({STREAMLIT_HOST}:{STREAMLIT_PORT}) unreachable"
+)
 skip_if_unreachable = pytest.mark.skipif(
     not _streamlit_reachable(), reason=_SKIP_REASON
 )
@@ -142,7 +181,9 @@ class TestStreamlitHealth:
 
 
 @pytest.mark.dashboard
-@skip_if_unreachable
+# Not gated on a server. Every check here reads app.py and the view modules
+# off disk, so gating it meant the page registry went unverified on any machine
+# that did not happen to have a dashboard running.
 class TestPageDefinitions:
     def test_all_pages_defined(self):
         """All expected page names exist in the PAGES registry of app.py."""
