@@ -42,13 +42,21 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
-    # ML prediction engine + enhanced indicators (require torch/ray/numba -- Python 3.13 max)
+    # Classical and gradient-boosted forecasters. Capped at Python 3.13:
+    # pandas-ta pulls in numba, which has no 3.14 wheel and fails to build.
     "pandas-ta>=0.3.14b",
     "lightgbm>=4.0.0",
     "statsforecast>=1.7.0",
-    "neuralforecast>=1.7.0",
     "prophet>=1.1.5",
     "arch>=7.0.0",
+]
+ml-neural = [
+    # TFT, PatchTST, N-HiTS and LSTM. Split out of [ml] because neuralforecast
+    # requires ray, whose newest release ships Windows wheels only up to
+    # Python 3.12 (Linux and macOS go to 3.14). Bundled into [ml] it took the
+    # whole extra down on Windows 3.13. Each model already reports itself
+    # unavailable when the import fails, so skipping this costs no crash.
+    "neuralforecast>=1.7.0",
 ]
 docs = [
     # Document parsing (torch dependency — isolate from neuralforecast)
@@ -63,17 +71,20 @@ e2e = [
     "playwright>=1.40.0",
 ]
 foundation = [
+    # Moirai (uni2ts) is left out on purpose: it pins numpy~=1.26 while this
+    # project needs numpy>=2, so listing it made the extra unresolvable.
+    # MoiraiModel already reports itself unavailable when the import fails.
     "chronos-forecasting>=1.0.0",
     "timesfm>=2.0.0",
-    "uni2ts>=1.0.0",
 ]
 nlp = [
     "transformers>=4.35.0",
 ]
 realtime = [
-    "websockets>=12.0",
-    "python-binance>=1.0.19",
-    "alpaca-trade-api>=3.0.0",
+    # alpaca-py, not alpaca-trade-api: the older SDK pins websockets<11 against
+    # Streamlit's >=12, so it could never be installed beside the dashboard.
+    # websockets and python-binance were listed here but never imported.
+    "alpaca-py>=0.21.0",
 ]
 reports = [
     "fpdf2>=2.7.0",
@@ -84,7 +95,9 @@ alt-data = [
     "pytrends>=4.9.0",
     # dbnomics removed — AGPL-3.0; module uses httpx REST API directly
     "mwviews>=0.1.0",
-    "sdmx1>=5.0.0",
+    # sdmx1 dropped: nothing imports it, and the pinned >=5.0.0 has never
+    # existed (2.26 is the newest release), so this extra could not resolve.
+    # The ECB module talks to the SDMX REST endpoint over httpx directly.
     "pycoingecko>=3.0.0",
     "fear-and-greed>=0.1.0",
 ]

@@ -1,7 +1,7 @@
 """Alpaca paper trading — submit orders via Alpaca API.
 
-Wraps the alpaca-trade-api (or alpaca-py) library with circuit-breaker
-protection and graceful import-error handling. All API calls are mockable.
+Wraps alpaca-py with circuit-breaker protection and graceful import-error
+handling. All API calls are mockable.
 """
 from __future__ import annotations
 
@@ -18,12 +18,24 @@ logger = logging.getLogger(__name__)
 # Try importing alpaca SDK — gracefully degrade if not installed
 # =============================================================================
 
+# alpaca-py, not the retired alpaca-trade-api. The old SDK pinned
+# websockets<11 while Streamlit needs >=12, so the two could never be
+# installed together and the [realtime] extra always failed to resolve.
 _ALPACA_AVAILABLE = False
 try:
-    import alpaca_trade_api as tradeapi  # type: ignore[import-untyped]
+    from alpaca.trading.client import TradingClient  # type: ignore[import-untyped]
+    from alpaca.trading.requests import (  # type: ignore[import-untyped]
+        LimitOrderRequest,
+        MarketOrderRequest,
+        StopLimitOrderRequest,
+        StopOrderRequest,
+    )
+
     _ALPACA_AVAILABLE = True
 except ImportError:
-    tradeapi = None  # type: ignore[assignment]
+    TradingClient = None  # type: ignore[assignment,misc]
+    LimitOrderRequest = MarketOrderRequest = None  # type: ignore[assignment,misc]
+    StopLimitOrderRequest = StopOrderRequest = None  # type: ignore[assignment,misc]
 
 
 # =============================================================================
@@ -169,8 +181,14 @@ class AlpacaPaperTrader:
         self._breaker = CircuitBreaker()
 
         if self._api is None and _ALPACA_AVAILABLE and api_key:
-            self._api = tradeapi.REST(
-                api_key, api_secret, self._base_url, api_version="v2"
+            # paper=True already points at paper-api.alpaca.markets, so only a
+            # caller-supplied base_url needs url_override.
+            override = base_url or None
+            self._api = TradingClient(
+                api_key=api_key,
+                secret_key=api_secret,
+                paper=True,
+                url_override=override,
             )
 
     @property
@@ -183,6 +201,23 @@ class AlpacaPaperTrader:
         return self._breaker
 
     # ── Orders ──
+
+    @staticmethod
+    def _build_request(order_type: OrderType, kwargs: dict[str, Any]) -> Any:
+        """Wrap order fields in the request object alpaca-py expects.
+
+        Returns the plain dict when the SDK is absent so an injected test
+        double still sees the fields it asserts on.
+        """
+        if not _ALPACA_AVAILABLE:
+            return kwargs
+        request_cls = {
+            OrderType.MARKET: MarketOrderRequest,
+            OrderType.LIMIT: LimitOrderRequest,
+            OrderType.STOP: StopOrderRequest,
+            OrderType.STOP_LIMIT: StopLimitOrderRequest,
+        }[order_type]
+        return request_cls(**kwargs)
 
     def submit_order(
         self,
@@ -220,7 +255,6 @@ class AlpacaPaperTrader:
                 "symbol": symbol,
                 "qty": qty,
                 "side": side.value,
-                "type": order_type.value,
                 "time_in_force": "day",
             }
             if limit_price is not None:
@@ -228,7 +262,9 @@ class AlpacaPaperTrader:
             if stop_price is not None:
                 kwargs["stop_price"] = stop_price
 
-            order = self._api.submit_order(**kwargs)
+            order = self._api.submit_order(
+                order_data=self._build_request(order_type, kwargs)
+            )
             self._breaker.record_success()
 
             return OrderResult(
@@ -263,7 +299,7 @@ class AlpacaPaperTrader:
             return []
 
         try:
-            raw_positions = self._api.list_positions()
+            raw_positions = self._api.get_all_positions()
             self._breaker.record_success()
             positions = []
             for p in raw_positions:

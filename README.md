@@ -175,14 +175,25 @@ data for rather than retrying it.
 | Extra | Install | Unlocks |
 |-------|---------|---------|
 | `ml` | `pip install -e ".[ml]"` | The prediction ensemble. Python 3.11 to 3.13 |
+| `ml-neural` | `pip install -e ".[ml-neural]"` | TFT, PatchTST, N-HiTS, LSTM. See the note below |
 | `alt-data` | `pip install -e ".[alt-data]"` | `news`, `trends`, `fear-greed --market equity` |
-| `foundation` | `pip install -e ".[foundation]"` | Chronos, TimesFM and Moirai forecasters |
-| `realtime` | `pip install -e ".[realtime]"` | Alpaca paper trading, websocket feeds |
+| `foundation` | `pip install -e ".[foundation]"` | Chronos and TimesFM forecasters |
+| `realtime` | `pip install -e ".[realtime]"` | Alpaca paper trading |
 | `reports` | `pip install -e ".[reports]"` | PDF output helpers |
 | `nlp` | `pip install -e ".[nlp]"` | Transformer sentiment models |
 | `docs` | `pip install -e ".[docs]"` | Docling PDF and DOCX parsing |
 | `e2e` | `pip install -e ".[e2e]"` | Playwright browser tests |
 | `dev` | `pip install -e ".[dev]"` | pytest and pyflakes |
+
+`ml-neural` is separate from `ml` because its `neuralforecast` dependency needs
+`ray`, and ray's newest release ships Windows wheels only through Python 3.12.
+On Linux and macOS it goes to 3.14. Installed or not, the models report
+themselves unavailable rather than failing the run.
+
+Moirai is not in `foundation`: its `uni2ts` package pins numpy 1.26 while this
+project needs numpy 2. The model stays in the tree and reports itself
+unavailable, so nothing breaks, but there is no supported way to install it
+alongside the rest.
 
 ## Prediction Engine
 
@@ -200,7 +211,7 @@ Twelve models feed a weighted ensemble vote. The core seven:
 | Prophet | Additive model | Seasonality |
 | GARCH | Volatility model | Volatility, used to adjust confidence |
 
-TFT, PatchTST, N-HiTS and TimesNet come along with the same extra, and the `[foundation]` extra adds pretrained time-series models.
+TFT, PatchTST, N-HiTS and TimesNet need the separate `[ml-neural]` extra, and the `[foundation]` extra adds pretrained time-series models.
 
 Everything validates walk-forward with `TimeSeriesSplit`. Ensemble weights adjust from tracked win rates, per model and per asset class, with a 5% floor so a cold streak cannot zero a model out. Predictions are stored in SQLite and scored against real outcomes later, which is what makes the win rate meaningful instead of decorative.
 

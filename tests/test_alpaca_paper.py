@@ -1,19 +1,16 @@
 """Tests for the Alpaca paper trading module."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from quant_tools.execution.alpaca import (
-    AccountInfo,
     AlpacaPaperTrader,
     CircuitBreaker,
-    OrderResult,
     OrderSide,
     OrderStatus,
     OrderType,
-    Position,
 )
 
 
@@ -82,7 +79,7 @@ class TestAlpacaPaperTrader:
         pos.current_price = "150.0"
         pos.unrealized_pl = "50.0"
         pos.market_value = "1500.0"
-        api.list_positions.return_value = [pos]
+        api.get_all_positions.return_value = [pos]
         # get_account returns mock account
         acct = MagicMock()
         acct.equity = "100000.0"
@@ -171,6 +168,32 @@ class TestAlpacaPaperTrader:
             "AAPL", 10, OrderSide.SELL, OrderType.LIMIT, limit_price=155.0
         )
         assert result.status == OrderStatus.FILLED
-        call_kwargs = mock_api.submit_order.call_args[1]
-        assert call_kwargs["type"] == "limit"
-        assert call_kwargs["limit_price"] == 155.0
+        sent = mock_api.submit_order.call_args.kwargs["order_data"]
+        # With alpaca-py installed this is a LimitOrderRequest; without it the
+        # fields pass straight through as a dict. Both shapes are valid, so the
+        # assertion reads whichever one arrived rather than pinning the test to
+        # whether the optional [realtime] extra happens to be present.
+        limit_price = sent["limit_price"] if isinstance(sent, dict) else sent.limit_price
+        side = sent["side"] if isinstance(sent, dict) else sent.side
+        assert float(limit_price) == 155.0
+        # The SDK coerces the plain string into its own OrderSide enum.
+        assert getattr(side, "value", side) == "sell"
+
+    def test_every_order_type_maps_to_a_request(self, trader, mock_api):
+        """No OrderType may fall through _build_request with a KeyError.
+
+        The request class is chosen by a lookup table, so a new OrderType added
+        without a matching entry would raise instead of placing the order.
+        """
+        prices = {
+            OrderType.LIMIT: {"limit_price": 155.0},
+            OrderType.STOP: {"stop_price": 145.0},
+            OrderType.STOP_LIMIT: {"limit_price": 155.0, "stop_price": 145.0},
+        }
+        for order_type in OrderType:
+            result = trader.submit_order(
+                "AAPL", 10, OrderSide.BUY, order_type, **prices.get(order_type, {})
+            )
+            assert result.status == OrderStatus.FILLED, (
+                f"{order_type.value} order was rejected: {result.error}"
+            )
