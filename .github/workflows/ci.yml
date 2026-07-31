@@ -50,9 +50,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install
+        # arch is not in [dev], it ships in [ml]. Without it the GARCH Monte
+        # Carlo tests skip, and since CI installed [dev] only they skipped here
+        # too, leaving run_monte_carlo_garch with no coverage anywhere. It is
+        # installed on its own rather than pulling all of [ml], which would drag
+        # in lightgbm, prophet and statsforecast for five tests.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev]" arch
       - name: Unit tests
         # tests/conftest.py blocks requests, httpx, urllib, yfinance and fredapi,
         # so this suite never touches the network.
