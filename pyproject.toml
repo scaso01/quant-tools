@@ -1,12 +1,47 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+# 77.0 is the floor for PEP 639, which is what lets `license` below be a plain
+# SPDX string with a separate `license-files`. Older setuptools only understands
+# the deprecated table form.
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "quant-tools"
 version = "0.1.0"
-description = "Quantitative finance toolkit for retail market analysis"
+description = "Multi-asset quantitative finance toolkit: scanning, backtesting, portfolio optimization, factor investing, ML prediction ensemble with win-rate tracking"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+# Name only. The email is deliberately absent: package metadata is permanent and
+# gets scraped, and LICENSE already carries the same name, so this adds nothing
+# a reader needs. Contact goes through the Issues URL below.
+authors = [{ name = "Sean Caso" }]
+keywords = [
+    "quantitative-finance",
+    "backtesting",
+    "portfolio-optimization",
+    "factor-investing",
+    "algorithmic-trading",
+    "market-data",
+    "technical-analysis",
+    "time-series-forecasting",
+]
+classifiers = [
+    # Checked against PyPI's live trove list. No "License :: OSI Approved ::"
+    # entry on purpose: setuptools rejects a license classifier alongside the
+    # SPDX expression above.
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "yfinance>=0.2.36",
     "fredapi>=0.5.2",
@@ -39,6 +74,12 @@ dependencies = [
     # Regime detection
     "hmmlearn>=0.3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/scaso01/quant-tools"
+Repository = "https://github.com/scaso01/quant-tools"
+Issues = "https://github.com/scaso01/quant-tools/issues"
+Changelog = "https://github.com/scaso01/quant-tools/releases"
 
 [project.optional-dependencies]
 ml = [
