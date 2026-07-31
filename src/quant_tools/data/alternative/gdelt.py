@@ -7,7 +7,10 @@ and translates events into 300+ categories.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
+import sys
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -16,6 +19,34 @@ from quant_tools.errors import DataError, NetworkError
 from quant_tools.retry import CircuitBreaker
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _muted_stdout():
+    """Silence stdout at the file-descriptor level for the enclosed block.
+
+    The gdelt wheel ships without its cameoCodes.json data file, so the bare
+    ``except: print('here')`` fallback in gdelt/base.py fires on every import
+    and refetches the file from GitHub. gdelt then fans the query out over
+    multiprocessing, and each spawned worker re-imports the module and prints
+    again, so one news query put a column of "here" ahead of its results.
+
+    Redirecting sys.stdout only covers this process; the workers inherit file
+    descriptor 1, so the redirect has to happen there. stderr is left alone, so
+    warnings and real errors still reach the user.
+    """
+    saved = os.dup(1)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        sys.stdout.flush()
+        os.dup2(devnull, 1)
+        yield
+    finally:
+        sys.stdout.flush()
+        os.dup2(saved, 1)
+        os.close(devnull)
+        os.close(saved)
+
 
 _breaker = CircuitBreaker("gdelt", threshold=3, recovery_seconds=90.0)
 
@@ -34,13 +65,19 @@ class GdeltClient:
         if self._gd is not None:
             return
         try:
-            from gdelt import gdelt as gdelt_module
+            with _muted_stdout():
+                from gdelt import gdelt as gdelt_module
 
-            self._gd = gdelt_module(version=2)
+                self._gd = gdelt_module(version=2)
         except ImportError:
             raise DataError(
                 "gdelt not installed. pip install gdelt"
             )
+
+    def _search_quietly(self, date_range: list[str]) -> pd.DataFrame | None:
+        """Run a GDELT search without the library's debug output."""
+        with _muted_stdout():
+            return self._gd.Search(date_range, table="events", coverage=False)
 
     def fetch_events(
         self,
@@ -81,11 +118,7 @@ class GdeltClient:
             )
             end_fmt = datetime.strptime(end_date, "%Y-%m-%d").strftime("%Y %b %d")
 
-            raw = self._gd.Search(
-                [start_fmt, end_fmt],
-                table="events",
-                coverage=False,
-            )
+            raw = self._search_quietly([start_fmt, end_fmt])
 
             if raw is None or (isinstance(raw, pd.DataFrame) and raw.empty):
                 _breaker.record_success()
@@ -173,11 +206,7 @@ class GdeltClient:
             )
             end_fmt = datetime.strptime(end_date, "%Y-%m-%d").strftime("%Y %b %d")
 
-            raw = self._gd.Search(
-                [start_fmt, end_fmt],
-                table="events",
-                coverage=False,
-            )
+            raw = self._search_quietly([start_fmt, end_fmt])
 
             if raw is None or (isinstance(raw, pd.DataFrame) and raw.empty):
                 _breaker.record_success()

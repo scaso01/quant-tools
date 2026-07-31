@@ -17,6 +17,7 @@ _download_lock = threading.Lock()
 
 from quant_tools.config import cfg
 from quant_tools.data.market_data import fetch_prices, fetch_ticker_info
+from quant_tools.errors import QuantToolsError
 from quant_tools.data.universe import SP500_TOP100
 from quant_tools.models import AssetClass, ScanResult, SignalType
 from quant_tools.scanner.signals import (
@@ -272,6 +273,13 @@ def _scan_single(
             details=details,
         )
 
+    except QuantToolsError as exc:
+        # A delisted ticker, or a pair the exchange does not list, is an
+        # ordinary outcome when scanning a broad universe. Each one used to
+        # print a full stack trace, so `scan --asset-class crypto` buried its
+        # own results under fifteen of them.
+        log.debug("Skipping %s: %s", symbol, exc)
+        return None
     except Exception:
         log.warning("Failed to scan %s", symbol, exc_info=True)
         return None
