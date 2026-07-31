@@ -1,3 +1,12 @@
+# Without this, Compose names the project after the directory holding this
+# file, which is "docker". Any other project that also keeps its compose file
+# in a subdirectory called "docker" then lands in the same project, and
+# `docker compose down` in either one tears down both. That is not
+# hypothetical: it happened on the machine this is deployed to, where a second
+# stack's database container was registered under the same project as this
+# dashboard.
+name: quant-tools
+
 services:
   dashboard:
     image: quant-tools-dashboard:latest
