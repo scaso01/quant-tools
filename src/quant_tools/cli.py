@@ -723,6 +723,20 @@ def _cmd_tearsheet(args: list[str]) -> None:
     print(f"  Sharpe: {data.sharpe_ratio:.2f}   Max drawdown: {data.max_drawdown:.2%}")
 
 
+def _yf_crypto_symbol(symbol: str) -> str:
+    """Rewrite a ccxt crypto pair into the form yfinance expects.
+
+    ``BTC/USDT`` and ``BTC/USD`` both become ``BTC-USD``; yfinance has no
+    stablecoin pairs. Anything without a slash is returned untouched.
+    """
+    if "/" not in symbol:
+        return symbol
+    base, _, quote = symbol.partition("/")
+    if quote.upper() in ("USDT", "USDC", "BUSD"):
+        quote = "USD"
+    return f"{base}-{quote}"
+
+
 def _cmd_paper_trade(args: list[str]) -> None:
     """Execute paper trades via Alpaca or crypto simulation."""
     import argparse
@@ -755,7 +769,13 @@ def _cmd_paper_trade(args: list[str]) -> None:
 
         from quant_tools.data.market_data import fetch_prices
 
-        price = float(fetch_prices(parsed.symbol, period="5d")["Close"].iloc[-1])
+        # Pricing goes through yfinance, which spells crypto pairs BTC-USD. The
+        # scanner and the universe lists speak ccxt's BTC/USDT, so pasting a
+        # symbol straight out of a scan used to hand yfinance a pair it does not
+        # know and print its raw HTML error page at the user.
+        price = float(
+            fetch_prices(_yf_crypto_symbol(parsed.symbol), period="5d")["Close"].iloc[-1]
+        )
         engine = CryptoPaperEngine()
         engine.update_price(parsed.symbol, price)
         order = engine.submit_order(
@@ -764,13 +784,21 @@ def _cmd_paper_trade(args: list[str]) -> None:
             parsed.qty,
             price,
         )
+        if order.error:
+            # The simulator starts flat every run, so a sell with nothing held
+            # comes back rejected. That used to print alongside an "Equity after
+            # fill" line and exit 0, which read like the order had gone through.
+            raise DataError(
+                f"Simulated {parsed.action} of {parsed.qty} {parsed.symbol} "
+                f"was rejected: {order.error}"
+            )
         print(f"\nSimulated {parsed.action}: {order}")
         print(f"  Equity after fill: ${engine.equity():,.2f}")
         return
 
     # AlpacaPaperTrader exposes get_account/get_positions/submit_order. There has
     # never been a get_account_status.
-    from quant_tools.execution.alpaca import AlpacaPaperTrader, OrderSide
+    from quant_tools.execution.alpaca import AlpacaPaperTrader, OrderSide, OrderStatus
 
     trader = AlpacaPaperTrader()
     if parsed.action == "status":
@@ -801,6 +829,13 @@ def _cmd_paper_trade(args: list[str]) -> None:
             parsed.qty,
             side=OrderSide.BUY if parsed.action == "buy" else OrderSide.SELL,
         )
+        if result.status is not OrderStatus.FILLED:
+            # A rejected order used to print "Order submitted" and exit 0, so a
+            # script driving this could not tell a fill from a refusal.
+            raise DataError(
+                f"Order for {parsed.symbol} was not filled: "
+                f"{result.error or result.status.value}"
+            )
         print(f"\nOrder submitted: {result}")
 
 
