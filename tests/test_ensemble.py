@@ -1,6 +1,8 @@
 """Tests for PredictionEnsemble weighted combiner."""
 from __future__ import annotations
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from quant_tools.errors import PredictionError
@@ -44,8 +46,17 @@ class MockModel:
     def train(self, features_df: object, target: object) -> None:
         if self._fail:
             raise RuntimeError(f"Mock failure in {self._name}")
+        # Real models set this at the end of train(), and predict() refuses to
+        # emit a result when no model reports itself trained. Leaving it False
+        # made this mock look like an untrained fallback.
+        self.state.is_trained = True
 
-    def predict(self, features_df: object, horizon_days: int = 5) -> PredictionResult:
+    def predict(
+        self, features_df: object, horizon_days: int = 5, interval: str = "1d"
+    ) -> PredictionResult:
+        # interval is accepted because PredictionEnsemble.predict passes it as a
+        # keyword. Without it every model raised TypeError, was swallowed by the
+        # ensemble's per-model except, and looked like a model that had failed.
         if self._fail:
             raise RuntimeError(f"Mock failure in {self._name}")
         return PredictionResult(
@@ -67,6 +78,28 @@ class MockModel:
 def _make_ensemble(models: list[MockModel], weights: dict[str, float] | None = None) -> PredictionEnsemble:
     """Build ensemble from mock models without triggering default model loading."""
     return PredictionEnsemble(models=models, weights=weights)
+
+
+def _ohlcv(periods: int = 300) -> pd.DataFrame:
+    """An OHLCV frame real enough for FeatureEngineer to build features from.
+
+    predict() runs feature engineering before it reaches any model, so a test
+    that wants to exercise the real path has to hand it a genuine frame rather
+    than None.
+    """
+    idx = pd.date_range("2024-01-01", periods=periods, freq="B")
+    rng = np.random.default_rng(7)
+    close = 100.0 * np.exp(np.cumsum(rng.normal(0.0003, 0.012, periods)))
+    return pd.DataFrame(
+        {
+            "Open": close * 0.999,
+            "High": close * 1.01,
+            "Low": close * 0.99,
+            "Close": close,
+            "Volume": rng.integers(1_000_000, 5_000_000, periods),
+        },
+        index=idx,
+    )
 
 
 # ── Tests: Direction Consensus ──────────────────────────────────────
@@ -392,23 +425,44 @@ class TestErrorHandling:
         assert result.direction == PredictionDirection.UP
         assert len(result.model_predictions) == 2
 
-    def test_empty_predictions_raises(self) -> None:
-        """If all models fail and produce no predictions, should raise."""
-        # TODO: this raises the error itself rather than getting it out of the
-        # ensemble, so it passes no matter what predict() does. Making it real
-        # means feeding predict() a genuine OHLCV frame (it runs
-        # FeatureEngineer before it reaches the models) and widening
-        # MockModel.predict to take the interval keyword the ensemble passes.
-        preds: list[PredictionResult] = []
-        with pytest.raises(PredictionError, match="All models failed"):
-            if not preds:
-                raise PredictionError("All models failed for TEST")
+    def test_all_models_failing_raises_out_of_predict(self) -> None:
+        """Every model failing has to surface as PredictionError from predict().
 
-    def test_all_models_fail_raises(self) -> None:
-        """If all model predictions are empty, _combine caller should raise."""
-        # TODO: same as above. Self-raised, so it does not exercise predict().
+        This used to raise the error itself inside pytest.raises, so it passed
+        whatever predict() did. It now goes through the real call.
+        """
+        models = [
+            MockModel("fail1", PredictionDirection.UP, fail=True),
+            MockModel("fail2", PredictionDirection.UP, fail=True),
+        ]
+        ens = _make_ensemble(models)
+
         with pytest.raises(PredictionError, match="All models failed"):
-            raise PredictionError("All models failed for TEST")
+            ens.predict(_ohlcv(), "TEST", AssetClass.EQUITY, horizon_days=5)
+
+    def test_a_single_failing_model_still_raises(self) -> None:
+        models = [MockModel("fail1", PredictionDirection.UP, fail=True)]
+        ens = _make_ensemble(models)
+
+        with pytest.raises(PredictionError, match="All models failed"):
+            ens.predict(_ohlcv(), "TEST", AssetClass.EQUITY, horizon_days=5)
+
+    def test_one_surviving_model_does_not_raise(self) -> None:
+        """The other half of the contract, and the part that catches a mock
+        whose signature has drifted from the real interface. If MockModel could
+        not accept what the ensemble passes it, the good model would fail too
+        and this would raise, so this test is what keeps the two above honest.
+        """
+        models = [
+            MockModel("fail1", PredictionDirection.UP, fail=True),
+            MockModel("good", PredictionDirection.UP, confidence=0.7),
+        ]
+        ens = _make_ensemble(models)
+
+        result = ens.predict(_ohlcv(), "TEST", AssetClass.EQUITY, horizon_days=5)
+        assert result.direction == PredictionDirection.UP
+        assert len(result.model_predictions) == 1
+        assert result.model_predictions[0].model_name == "good"
 
     def test_unsupported_asset_class_skipped(self) -> None:
         """Models that don't support an asset class should be skipped."""

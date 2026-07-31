@@ -128,15 +128,47 @@ class TestProphetPrediction:
         assert result.direction == PredictionDirection.NEUTRAL
 
     def test_log_suppression(self, trained_model):
-        """Verify cmdstanpy/prophet log levels are suppressed."""
+        """Verify cmdstanpy/prophet log levels are suppressed.
+
+        This used to run predict() and check nothing, on the reasoning that
+        reaching the end meant suppression had worked. It would have passed
+        with the suppression deleted.
+
+        It now checks all three things predict() does: raise both logger
+        levels, set CMDSTAN_VERBOSE while prophet runs, and put the variable
+        back afterwards so the process environment is not left modified.
+        """
+        import logging
+
         current = float(trained_model._close_prices[-1])
         mock_prophet = self._make_prophet_mock(current, current * 1.02, current * 1.05, current * 0.99)
-        mock_prophet_class = MagicMock(return_value=mock_prophet)
+
+        # Sample the environment at the moment prophet is constructed, which
+        # is the only window where the variable is supposed to be set.
+        seen: dict[str, str | None] = {}
+
+        def capture(*args: object, **kwargs: object) -> MagicMock:
+            seen["cmdstan"] = os.environ.get("CMDSTAN_VERBOSE")
+            return mock_prophet
+
+        mock_prophet_class = MagicMock(side_effect=capture)
+
+        # Drop both below WARNING first, so passing means predict() raised
+        # them rather than them already sitting at the expected level.
+        for name in ("cmdstanpy", "prophet"):
+            logging.getLogger(name).setLevel(logging.DEBUG)
+
+        fake_env = dict(os.environ)
+        fake_env.pop("CMDSTAN_VERBOSE", None)
 
         with patch.dict("sys.modules", {"prophet": MagicMock(Prophet=mock_prophet_class)}):
-            with patch("os.environ", dict(os.environ)):
+            with patch("os.environ", fake_env):
                 trained_model.predict(None, symbol="AAPL")
-                # If we got here without error, log suppression worked
+
+        assert logging.getLogger("cmdstanpy").level == logging.WARNING
+        assert logging.getLogger("prophet").level == logging.WARNING
+        assert seen["cmdstan"] == "0", "CMDSTAN_VERBOSE not set while prophet ran"
+        assert "CMDSTAN_VERBOSE" not in fake_env, "environment left modified"
 
     def test_predict_asset_class(self, trained_model):
         result = trained_model.predict(None, symbol="ETH", asset_class=AssetClass.CRYPTO)
