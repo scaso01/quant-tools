@@ -306,14 +306,19 @@ def _get_extended_preset(name: str) -> UniversePreset | None:
 
 # ── Multi-Asset Universes ──────────────────────────────────────────────
 
+# Quoted in USD, not USDT. The default exchange is Kraken, which lists only
+# twelve of these against USDT, so eight of the twenty failed on every scan,
+# tripped the ccxt circuit breaker and took some of the healthy symbols down
+# with it. All twenty are listed against USD. MATIC is gone entirely: Polygon
+# migrated the token to POL, which is what Kraken carries now.
 CRYPTO_UNIVERSE: dict[str, str] = {
-    "BTC/USDT": "Bitcoin", "ETH/USDT": "Ethereum", "BNB/USDT": "Binance Coin",
-    "SOL/USDT": "Solana", "XRP/USDT": "Ripple", "ADA/USDT": "Cardano",
-    "AVAX/USDT": "Avalanche", "DOT/USDT": "Polkadot", "DOGE/USDT": "Dogecoin",
-    "MATIC/USDT": "Polygon", "LINK/USDT": "Chainlink", "UNI/USDT": "Uniswap",
-    "ATOM/USDT": "Cosmos", "LTC/USDT": "Litecoin", "FIL/USDT": "Filecoin",
-    "NEAR/USDT": "NEAR Protocol", "APT/USDT": "Aptos", "ARB/USDT": "Arbitrum",
-    "OP/USDT": "Optimism", "INJ/USDT": "Injective",
+    "BTC/USD": "Bitcoin", "ETH/USD": "Ethereum", "BNB/USD": "Binance Coin",
+    "SOL/USD": "Solana", "XRP/USD": "Ripple", "ADA/USD": "Cardano",
+    "AVAX/USD": "Avalanche", "DOT/USD": "Polkadot", "DOGE/USD": "Dogecoin",
+    "POL/USD": "Polygon", "LINK/USD": "Chainlink", "UNI/USD": "Uniswap",
+    "ATOM/USD": "Cosmos", "LTC/USD": "Litecoin", "FIL/USD": "Filecoin",
+    "NEAR/USD": "NEAR Protocol", "APT/USD": "Aptos", "ARB/USD": "Arbitrum",
+    "OP/USD": "Optimism", "INJ/USD": "Injective",
 }
 
 FOREX_UNIVERSE: dict[str, str] = {

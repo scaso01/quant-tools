@@ -493,7 +493,29 @@ class TestScannerUniverse:
         """Crypto universe dict is populated."""
         from quant_tools.data.universe import CRYPTO_UNIVERSE
         assert len(CRYPTO_UNIVERSE) >= 10
-        assert "BTC/USDT" in CRYPTO_UNIVERSE
+        assert "BTC/USD" in CRYPTO_UNIVERSE
+
+    def test_crypto_lists_quote_in_usd(self):
+        """Both crypto symbol lists must quote against USD.
+
+        They used to quote against USDT, which Kraken, the default exchange,
+        lists for only some of these pairs. Eight of the twenty CLI symbols and
+        three of the fifteen dashboard symbols failed on every scan, and enough
+        consecutive failures tripped the ccxt circuit breaker, which then took
+        healthy symbols down with them. Checking the real exchange needs the
+        network, so this guards the spelling instead.
+        """
+        from quant_tools.dashboard.views.scanner import CRYPTO_SYMBOLS
+        from quant_tools.data.universe import CRYPTO_UNIVERSE
+
+        wrong_quote = [
+            sym
+            for sym in list(CRYPTO_UNIVERSE) + list(CRYPTO_SYMBOLS)
+            if not sym.endswith("/USD")
+        ]
+        assert not wrong_quote, (
+            f"crypto pairs not quoted in USD: {wrong_quote}"
+        )
 
     def test_forex_universe_has_entries(self):
         """Forex universe dict is populated."""

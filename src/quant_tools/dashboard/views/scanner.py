@@ -98,11 +98,14 @@ _DEFAULT_TIMEFRAME = "Monthly · 3 months"
 # Non-equity asset classes scan their own fixed symbol lists rather than an
 # equity universe preset. Module level so the sidebar can describe what is about
 # to be scanned, not just the scan itself.
+# Quoted in USD to match CRYPTO_UNIVERSE. Kraken, the default exchange, does
+# not list NEAR, APT or TRX against USDT, so those three failed on every crypto
+# scan from the dashboard. All fifteen are listed against USD.
 CRYPTO_SYMBOLS = [
-    "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT",
-    "ADA/USDT", "AVAX/USDT", "DOT/USDT", "DOGE/USDT",
-    "LINK/USDT", "ATOM/USDT", "LTC/USDT", "NEAR/USDT",
-    "APT/USDT", "ALGO/USDT", "TRX/USDT",
+    "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD",
+    "ADA/USD", "AVAX/USD", "DOT/USD", "DOGE/USD",
+    "LINK/USD", "ATOM/USD", "LTC/USD", "NEAR/USD",
+    "APT/USD", "ALGO/USD", "TRX/USD",
 ]
 FOREX_SYMBOLS = [
     "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD",

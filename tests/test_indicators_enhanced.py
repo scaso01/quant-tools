@@ -307,7 +307,7 @@ class TestUniverseUpdates:
     def test_crypto_universe_exists(self):
         from quant_tools.data.universe import CRYPTO_UNIVERSE
 
-        assert "BTC/USDT" in CRYPTO_UNIVERSE
+        assert "BTC/USD" in CRYPTO_UNIVERSE
         assert len(CRYPTO_UNIVERSE) == 20
 
     def test_forex_universe_exists(self):
@@ -326,7 +326,7 @@ class TestUniverseUpdates:
         from quant_tools.data.universe import get_universe
 
         symbols = get_universe(asset_class="crypto")
-        assert "BTC/USDT" in symbols
+        assert "BTC/USD" in symbols
 
     def test_get_universe_forex(self):
         from quant_tools.data.universe import get_universe
