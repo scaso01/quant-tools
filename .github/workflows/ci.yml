@@ -25,7 +25,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -c requirements-ci.txt -e ".[dev]"
       - name: pyflakes
         # The repo carried 100 findings before this gate existed, mostly dead
         # imports. They were cleared in one pass; this is what stops them
@@ -57,7 +57,7 @@ jobs:
         # in lightgbm, prophet and statsforecast for five tests.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]" arch
+          python -m pip install -c requirements-ci.txt -e ".[dev]" arch
       - name: Unit tests
         # tests/conftest.py blocks requests, httpx, urllib, yfinance and fredapi,
         # so this suite never touches the network.
@@ -75,7 +75,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,e2e]"
+          python -m pip install -c requirements-ci.txt -e ".[dev,e2e]"
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
       - name: Start the dashboard
@@ -123,3 +123,11 @@ jobs:
         # import is still broken, so exercise the CLI rather than trusting the
         # layer count.
         run: docker run --rm quant-tools:ci quant-tools --help
+
+  # The one check branch protection requires, so matrix changes never strand a merge.
+  ci-ok:
+    if: always()
+    needs: [lint, test, e2e, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ join(needs.*.result, ' ') }}" = "success success success success"
