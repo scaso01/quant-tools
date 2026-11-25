@@ -24,8 +24,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: ci/uv.lock
+      # ci/uv.lock holds the exact versions CI tests, solved as one set so updates never
+      # conflict. --locked fails the run if a pyproject changed without re-running `uv lock`.
       - name: Install
-        run: python -m pip install -c requirements-ci.txt -e ".[dev]"
+        run: |
+          python -m pip install uv==0.12.22
+          uv export --project ci --locked --no-hashes --no-emit-project --no-emit-package quant-tools -o "$RUNNER_TEMP/constraints.txt"
+          python -m pip install -c "$RUNNER_TEMP/constraints.txt" -e ".[dev]"
       - name: pyflakes
         # The repo carried 100 findings before this gate existed, mostly dead
         # imports. They were cleared in one pass; this is what stops them
@@ -49,6 +55,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: ci/uv.lock
       - name: Install
         # arch is not in [dev], it ships in [ml]. Without it the GARCH Monte
         # Carlo tests skip, and since CI installed [dev] only they skipped here
@@ -57,7 +64,9 @@ jobs:
         # in lightgbm, prophet and statsforecast for five tests.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -c requirements-ci.txt -e ".[dev]" arch
+          python -m pip install uv==0.12.22
+          uv export --project ci --locked --no-hashes --no-emit-project --no-emit-package quant-tools -o "$RUNNER_TEMP/constraints.txt"
+          python -m pip install -c "$RUNNER_TEMP/constraints.txt" -e ".[dev]" arch
       - name: Unit tests
         # tests/conftest.py blocks requests, httpx, urllib, yfinance and fredapi,
         # so this suite never touches the network.
@@ -72,10 +81,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: ci/uv.lock
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -c requirements-ci.txt -e ".[dev,e2e]"
+          python -m pip install uv==0.12.22
+          uv export --project ci --locked --no-hashes --no-emit-project --no-emit-package quant-tools -o "$RUNNER_TEMP/constraints.txt"
+          python -m pip install -c "$RUNNER_TEMP/constraints.txt" -e ".[dev,e2e]"
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
       - name: Start the dashboard

@@ -1,9 +1,13 @@
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: /
+  # uv re-solves ci/uv.lock as a whole, so one update cannot clash with another package's needs.
+  - package-ecosystem: uv
+    directory: /ci
     schedule:
       interval: monthly
+    allow:
+      # The default covers only the packages ci/pyproject.toml names; this updates all of the lock.
+      - dependency-type: all
     groups:
       all-dependencies:
         patterns: ["*"]
