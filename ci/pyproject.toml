@@ -1,0 +1,14 @@
+# Only what CI installs. A lock over the root project would also have to solve
+# extras CI never installs (pandas-ta needs numpy<2.3), so this one is scoped.
+[project]
+name = "quant-tools-ci"
+version = "0"
+requires-python = ">=3.11"
+dependencies = ["quant-tools[dev,e2e]", "arch"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+quant-tools = { path = "..", editable = true }
+
